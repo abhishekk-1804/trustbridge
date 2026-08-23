@@ -203,7 +203,7 @@ def generate_synthetic_data():
 
         for txn in all_transactions:
             if txn.is_anomaly:
-                print(f"  Anomaly: User {txn.user_id}, Txn {txn.id}, Amount ₹{txn.amount}, Type: {txn.anomaly_type}")
+                print(f"  Anomaly: User {txn.user_id}, Txn {txn.id}, Amount Rs.{txn.amount}, Type: {txn.anomaly_type}")
 
     finally:
         session.close()
