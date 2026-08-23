@@ -1,8 +1,9 @@
 import random
 from datetime import datetime, timedelta
+from decimal import Decimal
 from database.models import (
     User, Account, Transaction,
-    UserRole, TransactionType, TransactionStatus, PaymentMethod
+    UserRole, TransactionType, TransactionStatus, PaymentMethod, AccountStatus
 )
 from database.db import get_session_direct, init_db, reset_db
 
@@ -85,9 +86,9 @@ def generate_transaction_amount(profile, txn_index):
 
     if txn_index == profile["anomaly_txn_idx"]:
         base_amount *= profile["anomaly_multiplier"]
-        return round(base_amount, 2), True, "AMOUNT_SPIKE"
+        return int(Decimal(str(round(base_amount, 2))) * Decimal(100)), True, "AMOUNT_SPIKE"
 
-    return round(base_amount, 2), False, None
+    return int(Decimal(str(round(base_amount, 2))) * Decimal(100)), False, None
 
 
 def generate_merchant():
@@ -173,8 +174,9 @@ def generate_synthetic_data():
             account = Account(
                 user_id=user.id,
                 account_type="savings",
-                balance=random.uniform(10000, 50000),
+                balance=int(Decimal(str(random.uniform(10000, 50000))) * Decimal(100)),
                 currency="INR",
+                status=AccountStatus.ACTIVE,
                 created_at=start_date - timedelta(days=30)
             )
             session.add(account)
@@ -203,7 +205,7 @@ def generate_synthetic_data():
 
         for txn in all_transactions:
             if txn.is_anomaly:
-                print(f"  Anomaly: User {txn.user_id}, Txn {txn.id}, Amount Rs.{txn.amount}, Type: {txn.anomaly_type}")
+                print(f"  Anomaly: User {txn.user_id}, Txn {txn.id}, Amount Rs.{txn.get_amount_decimal()}, Type: {txn.anomaly_type}")
 
     finally:
         session.close()
