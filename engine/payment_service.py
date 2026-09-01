@@ -101,7 +101,7 @@ def from_paise(paise: int) -> Decimal:
 def assess_payment_risk(
     sender_account_id: int,
     receiver_account_id: int,
-    amount: Decimal,
+    amount: float,
     payment_method: SimulatedPaymentMethod,
     session: Session
 ) -> Dict[str, Any]:
@@ -110,6 +110,8 @@ def assess_payment_risk(
     
     Returns structured risk assessment for the payment.
     """
+    amount_decimal = Decimal(str(amount))
+    
     # Get sender's trust score
     sender_account = session.query(Account).filter(Account.id == sender_account_id).first()
     if not sender_account:
@@ -137,17 +139,18 @@ def assess_payment_risk(
                 self.id = txn_id
                 self.transaction_type = TransactionType.DEBIT
         
-        mock_txn = MockTxn(user_id, to_paise(amount), 0)
+        mock_txn = MockTxn(user_id, to_paise(amount_decimal), 0)
         fraud_rule_result = detect_amount_spike(mock_txn, session)
     
     # ML anomaly prediction
     # Create features for the payment
     categorical_mappings = build_categorical_mappings(session)
+    payment_method_value = payment_method.value if hasattr(payment_method, 'value') else payment_method
     payment_features = {
         "amount": float(amount),
         "transaction_type": "debit",
         "status": "success",
-        "payment_method": payment_method.value,
+        "payment_method": payment_method_value,
         "merchant_category": "Payment Transfer",
         "merchant_name": "Account Transfer",
         "location_city": "Unknown",
@@ -303,13 +306,14 @@ def simulate_payment(
     Raises:
         PaymentError: For various payment failures
     """
-    if amount <= 0:
-        raise InvalidAmountError(amount)
+    amount_decimal = Decimal(str(amount))
+    if amount_decimal <= 0:
+        raise InvalidAmountError(amount_decimal)
     
     if sender_account_id == receiver_account_id:
         raise SameAccountError(sender_account_id)
     
-    amount_paise = to_paise(amount)
+    amount_paise = to_paise(amount_decimal)
     reference_id = generate_reference_id()
     
     # Handle session management
@@ -344,7 +348,7 @@ def simulate_payment(
         # Check sufficient balance
         sender_balance = sender_account.balance
         if sender_balance < amount_paise:
-            raise InsufficientBalanceError(from_paise(sender_balance), amount)
+            raise InsufficientBalanceError(from_paise(sender_balance), amount_decimal)
         
         # Risk assessment
         risk_assessment = assess_payment_risk(

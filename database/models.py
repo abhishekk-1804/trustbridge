@@ -140,7 +140,7 @@ class PaymentTransaction(Base):
     amount = Column(BigInteger, nullable=False)  # Stored in minor units (paise)
     currency = Column(String(3), default="INR")
     
-    payment_method = Column(Enum(SimulatedPaymentMethod), nullable=False)
+    payment_method = Column(Enum(SimulatedPaymentMethod, values_callable=lambda x: [e.value for e in x]), nullable=False)
     status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     
     # Risk assessment at time of payment
