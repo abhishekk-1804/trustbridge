@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
 
 from backend.schemas.dashboard import DashboardSummaryResponse
@@ -75,8 +76,12 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
         else:
             trust_dist["low"] += 1
     
-    # Recent transactions count (last 24 hours) - use a wider window for demo data
-    recent_cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+    # Recent transactions count: transactions within 30 days of the latest transaction in the DB
+    latest_txn_time = db.query(func.max(Transaction.timestamp)).scalar()
+    if latest_txn_time is not None:
+        recent_cutoff = latest_txn_time - timedelta(days=30)
+    else:
+        recent_cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     recent_transactions = db.query(Transaction).filter(
         Transaction.timestamp >= recent_cutoff
     ).count()

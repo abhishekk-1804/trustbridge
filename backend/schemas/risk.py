@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -45,8 +45,12 @@ class FraudRuleResult(BaseModel):
     risk_level: str
     reason: str
     transaction_id: Optional[int] = None
-    transaction_amount: Optional[float] = None
-    reference_average: Optional[float] = None
+    transaction_amount: Optional[float] = Field(
+        None, description="Transaction amount in minor units (paise)."
+    )
+    reference_average: Optional[float] = Field(
+        None, description="Baseline reference average in minor units (paise)."
+    )
     ratio: Optional[float] = None
     multiplier_used: Optional[float] = None
 

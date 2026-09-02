@@ -3,6 +3,11 @@ from sqlalchemy.orm import Session
 from database.models import Transaction
 
 
+def _paise_to_rupees(paise: int) -> float:
+    """Convert paise (minor units) to rupees (major units)."""
+    return paise / 100.0
+
+
 def calculate_historical_average(user_id: int, session: Session, exclude_txn_id: Optional[int] = None) -> float:
     query = session.query(Transaction).filter(
         Transaction.user_id == user_id,
@@ -64,20 +69,26 @@ def detect_amount_spike(transaction: Transaction, session: Session, multiplier: 
     ratio = transaction.amount / reference_avg
     flagged = ratio > multiplier
     
+    # Convert paise to rupees for display in reason string
+    # NOTE: internal FraudRuleResult monetary values (transaction_amount, reference_average)
+    # remain in paise; the rupee conversion is display-only for human-readable reason strings.
+    txn_amount_rupees = _paise_to_rupees(transaction.amount)
+    ref_avg_rupees = _paise_to_rupees(reference_avg)
+
     if flagged:
         risk_level = "HIGH"
-        reason = f"Transaction amount (Rs.{transaction.amount:.2f}) is {ratio:.1f}x the user's normal average (Rs.{reference_avg:.2f})"
+        reason = f"Transaction amount (Rs.{txn_amount_rupees:.2f}) is {ratio:.1f}x the user's normal average (Rs.{ref_avg_rupees:.2f})"
     else:
         risk_level = "LOW"
-        reason = f"Transaction amount (Rs.{transaction.amount:.2f}) is within normal range ({ratio:.1f}x average)"
+        reason = f"Transaction amount (Rs.{txn_amount_rupees:.2f}) is within normal range ({ratio:.1f}x average)"
     
     return {
         "flagged": flagged,
         "risk_level": risk_level,
         "reason": reason,
         "transaction_id": transaction.id,
-        "transaction_amount": round(transaction.amount, 2),
-        "reference_average": round(reference_avg, 2),
+        "transaction_amount": transaction.amount,
+        "reference_average": reference_avg,
         "ratio": round(ratio, 2),
         "multiplier_used": multiplier
     }

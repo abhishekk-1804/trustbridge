@@ -100,7 +100,15 @@ async def list_risk_events(
     source: Optional[str] = Query(None, pattern="^(rule|ml|both)$"),
     db: Session = Depends(get_db)
 ):
-    """List risk events with filtering."""
+    """
+    List risk events with filtering.
+
+    Returns detector-level observations from both Rule Engine and ML Isolation Forest.
+    Each observation is a separate entry; a single transaction may appear twice
+    (once per detector). Therefore this endpoint should NOT be interpreted as a
+    unique-transaction count. For the consolidated transaction-level risk view,
+    use GET /api/risk/events/{id}.
+    """
     events = []
     
     # Get ML anomalies
@@ -133,6 +141,8 @@ async def list_risk_events(
     for user in db.query(User).all():
         flagged = get_flagged_transactions(user.id, db)
         for f in flagged:
+            # Fetch ground truth from the actual transaction
+            txn = db.query(Transaction).filter(Transaction.id == f["transaction_id"]).first()
             events.append(RiskEventResponse(
                 id=f["transaction_id"],
                 user_id=user.id,
@@ -145,8 +155,8 @@ async def list_risk_events(
                 final_decision="flagged",
                 reason=f["reason"],
                 timestamp=datetime.now(timezone.utc),
-                is_ground_truth_anomaly=False,
-                ground_truth_type=None
+                is_ground_truth_anomaly=txn.is_anomaly if txn else False,
+                ground_truth_type=txn.anomaly_type if txn else None
             ))
     
     # Apply filters

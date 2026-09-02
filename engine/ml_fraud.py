@@ -145,7 +145,8 @@ def score_all_transactions(user_id: Optional[int] = None) -> List[Dict[str, Any]
         model, scaler, feature_cols = load_model()
         categorical_mappings = build_categorical_mappings(session)
         
-        query = session.query(Transaction).filter(Transaction.transaction_type == "DEBIT")
+        # Use same transaction scope as training (all transaction types) for consistency
+        query = session.query(Transaction)
         if user_id:
             query = query.filter(Transaction.user_id == user_id)
         
@@ -187,7 +188,9 @@ def evaluate_model() -> Dict[str, Any]:
         model, scaler, feature_cols = load_model()
         categorical_mappings = build_categorical_mappings(session)
         
-        transactions = session.query(Transaction).filter(Transaction.transaction_type == "DEBIT").order_by(Transaction.timestamp.asc()).all()
+        # Evaluates across all transaction types (DEBIT + CREDIT) to match
+        # train_isolation_forest() and the feature-engineering population.
+        transactions = session.query(Transaction).order_by(Transaction.timestamp.asc()).all()
         
         all_features = []
         y_true = []
@@ -256,7 +259,8 @@ def compare_rule_vs_ml(user_id: Optional[int] = None, multiplier: float = 3.0, l
         model, scaler, feature_cols = load_model()
         categorical_mappings = build_categorical_mappings(session)
         
-        query = session.query(Transaction).filter(Transaction.transaction_type == "DEBIT")
+        # Use same transaction scope as training (all transaction types) for consistency
+        query = session.query(Transaction)
         if user_id:
             query = query.filter(Transaction.user_id == user_id)
         
