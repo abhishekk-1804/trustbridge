@@ -1,6 +1,5 @@
 from typing import List
-from datetime import datetime, timedelta
-from sqlalchemy import func
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from database.models import User, Transaction, TransactionStatus
 
@@ -42,7 +41,7 @@ def calculate_account_behaviour(transactions: List[Transaction], account_created
     if not transactions:
         return 50.0
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     days_active = max(1, (now - account_created_at).days)
     txn_count = len(transactions)
 

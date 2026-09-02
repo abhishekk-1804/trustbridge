@@ -1,20 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
 
 from backend.schemas.users import UserListResponse, UserResponse
-from backend.schemas.risk import RiskAssessment
-from backend.schemas.payments import PaymentTransactionResponse
 
-from backend.database import get_db_session
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.db import get_session_direct
-from database.models import User, Account, Transaction, PaymentTransaction
-from engine.trust_score import calculate_trust_score, get_all_users, get_user_transactions
+from database.models import User, Account, PaymentTransaction
+from engine.trust_score import calculate_trust_score, get_user_transactions
 from engine.fraud_rules import get_flagged_transactions
 
 router = APIRouter()

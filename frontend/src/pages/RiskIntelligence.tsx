@@ -221,19 +221,19 @@ export function RiskIntelligence() {
           {comparison ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50 text-center">
-                <p className="text-2xl font-bold text-text">{comparison.counts.both}</p>
+                <p className="text-2xl font-bold text-text">{comparison.comparison?.counts?.both ?? 0}</p>
                 <p className="text-xs text-text-muted">Detected by Both</p>
               </div>
               <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50 text-center">
-                <p className="text-2xl font-bold text-text">{comparison.counts.rule_only}</p>
+                <p className="text-2xl font-bold text-text">{comparison.comparison?.counts?.rule_only ?? 0}</p>
                 <p className="text-xs text-text-muted">Rule Only</p>
               </div>
               <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50 text-center">
-                <p className="text-2xl font-bold text-text">{comparison.counts.ml_only}</p>
+                <p className="text-2xl font-bold text-text">{comparison.comparison?.counts?.ml_only ?? 0}</p>
                 <p className="text-xs text-text-muted">ML Only</p>
               </div>
               <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50 text-center">
-                <p className="text-2xl font-bold text-text">{comparison.counts.neither}</p>
+                <p className="text-2xl font-bold text-text">{comparison.comparison?.counts?.neither ?? 0}</p>
                 <p className="text-xs text-text-muted">Neither</p>
               </div>
             </div>

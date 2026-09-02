@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { useUsers } from '@/api';
+import { useUsers, useAskCopilot, useCopilotStatus } from '@/api';
 import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -44,11 +44,11 @@ export function AICopilot() {
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
   const [showExamples, setShowExamples] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [copilotStatus, setCopilotStatus] = useState<{ available: boolean; provider: string | null }>({
-    available: false,
-    provider: null,
-  });
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+
+  const { data: copilotStatusData, isLoading: statusLoading, refetch: refetchCopilotStatus } = useCopilotStatus();
+  const copilotStatus = copilotStatusData ?? { available: false, provider: null, model: null, message: '' };
+  const askCopilotMutation = useAskCopilot();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -57,20 +57,6 @@ export function AICopilot() {
   React.useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  React.useEffect(() => {
-    checkCopilotStatus();
-  }, []);
-
-  const checkCopilotStatus = async () => {
-    try {
-      const response = await fetch('/api/copilot/status');
-      const data = await response.json();
-      setCopilotStatus(data);
-    } catch {
-      setCopilotStatus({ available: false, provider: null });
-    }
-  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,24 +81,13 @@ export function AICopilot() {
         assistant: m.role === 'assistant' ? m.content : undefined,
       })).filter((m) => m.user || m.assistant);
 
-      const response = await fetch('/api/copilot/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: userQuery,
-          user_id: selectedUserId,
-          transaction_id: selectedTransactionId,
-          payment_id: selectedPaymentId,
-          conversation_history: conversationHistory,
-        }),
+      const data = await askCopilotMutation.mutateAsync({
+        query: userQuery,
+        user_id: selectedUserId,
+        transaction_id: selectedTransactionId,
+        payment_id: selectedPaymentId,
+        conversation_history: conversationHistory,
       });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || `HTTP ${response.status}`);
-      }
-
-      const data: CopilotResponse = await response.json();
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',

@@ -208,18 +208,26 @@ export function Verification() {
                 )},
                 { key: 'actions', header: 'Actions', render: (row) => (
                   <div className="flex items-center gap-1">
-                    <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="View Details">
+                    <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="View Details (demo)">
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="View Documents">
+                    <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="View Documents (demo)">
                       <FileText className="w-4 h-4" />
                     </button>
                     {row.verification_status === 'pending' && (
                       <>
-                        <button className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors" title="Approve">
+                        <button
+                          className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors opacity-50 cursor-not-allowed"
+                          title="Approve (demo only - no backend endpoint)"
+                          disabled
+                        >
                           <CheckCircle className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition-colors" title="Reject">
+                        <button
+                          className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-50 cursor-not-allowed"
+                          title="Reject (demo only - no backend endpoint)"
+                          disabled
+                        >
                           <UserX className="w-4 h-4" />
                         </button>
                       </>

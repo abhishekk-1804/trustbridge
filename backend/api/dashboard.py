@@ -1,22 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from backend.database import get_db_session
 from backend.schemas.dashboard import DashboardSummaryResponse
-from backend.schemas.users import UserListResponse, UserResponse
-from backend.schemas.risk import RiskEventResponse
-from backend.schemas.payments import DashboardSummaryResponse as PaymentsDashboardSummary
 
 # Import existing engines - use backend.database for correct DB path
-from backend.database import get_db_session_direct
-from database.models import User, Account, Transaction, PaymentTransaction, LedgerEntry
-from engine.trust_score import calculate_trust_score, get_all_users
-from engine.fraud_rules import get_flagged_transactions, detect_amount_spike
-from engine.ml_fraud import score_all_transactions, evaluate_model, compare_rule_vs_ml
-from engine.payment_service import simulate_payment, verify_ledger_balance
+from backend.db import get_db_session_direct
+from database.models import User, Transaction
+from engine.trust_score import calculate_trust_score
+from engine.fraud_rules import get_flagged_transactions
+from engine.ml_fraud import score_all_transactions
 
 router = APIRouter()
 
@@ -83,7 +76,7 @@ async def get_dashboard_summary(db: Session = Depends(get_db)):
             trust_dist["low"] += 1
     
     # Recent transactions count (last 24 hours) - use a wider window for demo data
-    recent_cutoff = datetime.utcnow() - timedelta(days=365)
+    recent_cutoff = datetime.now(timezone.utc) - timedelta(days=365)
     recent_transactions = db.query(Transaction).filter(
         Transaction.timestamp >= recent_cutoff
     ).count()
@@ -122,7 +115,7 @@ async def get_risk_activity(db: Session = Depends(get_db)):
     days = 7
     data = []
     for i in range(days):
-        date = datetime.utcnow().date() - timedelta(days=i)
+        date = datetime.now(timezone.utc).date() - timedelta(days=i)
         date_str = date.isoformat()
         data.append({
             "date": date_str,
@@ -166,7 +159,7 @@ async def get_live_risk_feed(limit: int = 10, db: Session = Depends(get_db)):
                 "amount": f["transaction_amount"] / 100.0,  # Convert from paise
                 "risk_level": f["risk_level"],
                 "source": "rule",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "reason": f["reason"]
             })
     

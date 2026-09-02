@@ -1,12 +1,11 @@
 import os
 import joblib
-import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Optional, Tuple
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, classification_report
-from engine.ml_features import build_ml_dataset, prepare_training_data, FEATURE_COLUMNS, extract_transaction_features, build_categorical_mappings
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+from engine.ml_features import build_ml_dataset, prepare_training_data, extract_transaction_features, build_categorical_mappings
 from database.db import get_session_direct, init_db
 
 
@@ -138,7 +137,7 @@ def predict_batch(features_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def score_all_transactions(user_id: Optional[int] = None) -> List[Dict[str, Any]]:
-    from database.models import Transaction, User
+    from database.models import Transaction
     from engine.ml_features import extract_transaction_features, build_categorical_mappings
     
     session = get_session_direct()

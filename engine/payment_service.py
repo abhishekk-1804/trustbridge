@@ -9,19 +9,19 @@ Simulated payment processing with:
 - Balance validation
 """
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from database.models import (
-    User, Account, PaymentTransaction, LedgerEntry,
+    Account, PaymentTransaction, LedgerEntry,
     AccountStatus, PaymentStatus, SimulatedPaymentMethod, TransactionType
 )
 from database.db import get_session_direct
 from engine.trust_score import calculate_trust_score
 from engine.fraud_rules import detect_amount_spike
-from engine.ml_fraud import predict_anomaly, explain_anomaly
-from engine.ml_features import extract_transaction_features, build_categorical_mappings
+from engine.ml_fraud import predict_anomaly
+from engine.ml_features import build_categorical_mappings
 import uuid
 
 
@@ -83,7 +83,7 @@ class RiskRejectionError(PaymentError):
 
 def generate_reference_id() -> str:
     """Generate a human-readable payment reference."""
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     unique = uuid.uuid4().hex[:8].upper()
     return f"TB{timestamp}{unique}"
 
@@ -154,7 +154,7 @@ def assess_payment_risk(
         "merchant_category": "Payment Transfer",
         "merchant_name": "Account Transfer",
         "location_city": "Unknown",
-        "timestamp": datetime.utcnow(),
+        "timestamp": datetime.now(timezone.utc),
         "user_id": user_id,
         "is_anomaly": False,
         "anomaly_type": None
@@ -378,8 +378,8 @@ def simulate_payment(
                 ml_is_anomaly=ml_anomaly.get("is_anomaly", False) if isinstance(ml_anomaly, dict) else False,
                 risk_policy_decision=risk_decision,
                 failure_reason=f"Risk policy: {risk_decision} - {'; '.join(risk_drivers)}",
-                created_at=datetime.utcnow(),
-                completed_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc)
             )
             session.add(payment)
             session.commit()
@@ -413,8 +413,8 @@ def simulate_payment(
             ml_anomaly_score=ml_anomaly.get("anomaly_score") if isinstance(ml_anomaly, dict) else None,
             ml_is_anomaly=ml_anomaly.get("is_anomaly", False) if isinstance(ml_anomaly, dict) else False,
             risk_policy_decision=risk_decision,
-            created_at=datetime.utcnow(),
-            completed_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc)
         )
         session.add(payment)
         session.flush()  # Get payment.id

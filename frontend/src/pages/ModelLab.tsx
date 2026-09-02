@@ -170,25 +170,25 @@ export function ModelLab() {
                 <div className="grid grid-cols-4 gap-4">
                   <ComparisonCard
                     label="Both Detected"
-                    count={comparison.counts.both}
+                    count={comparison.comparison?.counts?.both ?? 0}
                     color="emerald"
                     icon={<CheckCircle className="w-5 h-5" />}
                   />
                   <ComparisonCard
                     label="Rule Only"
-                    count={comparison.counts.rule_only}
+                    count={comparison.comparison?.counts?.rule_only ?? 0}
                     color="blue"
                     icon={<Shield className="w-5 h-5" />}
                   />
                   <ComparisonCard
                     label="ML Only"
-                    count={comparison.counts.ml_only}
+                    count={comparison.comparison?.counts?.ml_only ?? 0}
                     color="purple"
                     icon={<Brain className="w-5 h-5" />}
                   />
                   <ComparisonCard
                     label="Neither"
-                    count={comparison.counts.neither}
+                    count={comparison.comparison?.counts?.neither ?? 0}
                     color="neutral"
                     icon={<XCircle className="w-5 h-5" />}
                   />
@@ -197,7 +197,7 @@ export function ModelLab() {
                 <div className="pt-4 border-t border-border">
                   <h4 className="text-sm font-medium text-text-muted mb-3">Detail: Both Detected (Ground Truth)</h4>
                   <Table
-                    data={comparison.comparison.both.slice(0, 10)}
+                    data={comparison.comparison?.comparison?.both?.slice(0, 10) ?? []}
                     columns={[
                       { key: 'transaction_id', header: 'TXN ID', render: (row) => `#${row.transaction_id}`, className: 'w-20' },
                       { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount), className: 'w-28' },
@@ -216,7 +216,7 @@ export function ModelLab() {
                 <div className="pt-4 border-t border-border">
                   <h4 className="text-sm font-medium text-text-muted mb-3">Detail: ML Only (Potential False Positives / Missed by Rules)</h4>
                   <Table
-                    data={comparison.comparison.ml_only.slice(0, 10)}
+                    data={comparison.comparison?.comparison?.ml_only?.slice(0, 10) ?? []}
                     columns={[
                       { key: 'transaction_id', header: 'TXN ID', render: (row) => `#${row.transaction_id}`, className: 'w-20' },
                       { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount), className: 'w-28' },
@@ -233,7 +233,7 @@ export function ModelLab() {
                 </div>
 
                 <p className="text-xs text-text-muted text-center pt-4 border-t border-border">
-                  Total analyzed: {comparison.total_analyzed} transactions
+                  Total analyzed: {comparison.comparison?.total_analyzed ?? 0} transactions
                 </p>
               </>
             ) : (

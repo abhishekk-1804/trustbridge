@@ -4,12 +4,10 @@ from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 import re
 
-from backend.database import get_db_session
 from backend.ai_copilot import (
     ContextBuilder,
     build_messages,
     call_llm,
-    CopilotContext,
     settings,
 )
 import sys

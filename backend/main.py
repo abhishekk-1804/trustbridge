@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -19,7 +19,7 @@ from backend.api.risk import router as risk_router
 from backend.api.payments import router as payments_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.copilot import router as copilot_router
-from backend.database import init_db
+from backend.db import init_db
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level.upper()))

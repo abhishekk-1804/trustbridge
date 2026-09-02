@@ -10,6 +10,8 @@ import json
 import os
 import sys
 
+import httpx
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.config import settings
@@ -119,7 +121,6 @@ class ContextBuilder:
 
     def _get_user_transactions(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
         from engine.trust_score import get_user_transactions
-        from database.models import Transaction
         txns = get_user_transactions(user_id, self.session, limit=limit)
         return [
             {
@@ -202,7 +203,7 @@ class ContextBuilder:
         }
 
     def _get_ledger_data(self, payment_id: int) -> List[Dict[str, Any]]:
-        from database.models import LedgerEntry, TransactionType
+        from database.models import LedgerEntry
         entries = self.session.query(LedgerEntry).filter(
             LedgerEntry.payment_transaction_id == payment_id
         ).all()
@@ -306,6 +307,12 @@ async def call_llm(messages: List[Dict[str, str]]) -> str:
             return await _call_google(messages)
         else:
             return f"Unsupported AI provider: {provider}"
+    except httpx.TimeoutException:
+        return "AI request timed out. Please try again."
+    except httpx.HTTPStatusError as e:
+        return f"AI provider returned error {e.response.status_code}. Check configuration."
+    except httpx.RequestError as e:
+        return f"AI provider network error: {type(e).__name__}. Check connectivity."
     except Exception as e:
         return f"AI provider error: {type(e).__name__}. Check server logs for details."
 
@@ -340,8 +347,12 @@ async def _call_anthropic(messages: List[Dict[str, str]]) -> str:
         "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",
     }
+    # Use provider-appropriate default model if OpenAI model is configured
+    model = settings.ai_model
+    if model.startswith("gpt-"):
+        model = "claude-3-haiku-20240307"
     payload = {
-        "model": settings.ai_model,
+        "model": model,
         "system": system_msg,
         "messages": user_msgs,
         "max_tokens": settings.ai_max_tokens,
@@ -355,7 +366,6 @@ async def _call_anthropic(messages: List[Dict[str, str]]) -> str:
 
 
 async def _call_google(messages: List[Dict[str, str]]) -> str:
-    import httpx
     # Convert to Google Gemini format
     combined = "\n\n".join(f"{m['role']}: {m['content']}" for m in messages)
     headers = {"Content-Type": "application/json"}
@@ -366,7 +376,11 @@ async def _call_google(messages: List[Dict[str, str]]) -> str:
             "temperature": settings.ai_temperature,
         },
     }
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.ai_model}:generateContent?key={settings.ai_api_key}"
+    # Use provider-appropriate default model if OpenAI model is configured
+    model = settings.ai_model
+    if model.startswith("gpt-"):
+        model = "gemini-1.5-flash"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.ai_api_key}"
     async with httpx.AsyncClient(timeout=settings.ai_timeout_seconds) as client:
         response = await client.post(url, headers=headers, json=payload)
         response.raise_for_status()

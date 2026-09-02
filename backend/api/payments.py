@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
 
 from backend.schemas.payments import (
     SimulatePaymentRequest, 
@@ -9,19 +8,16 @@ from backend.schemas.payments import (
     PaymentTransactionResponse,
     LedgerEntryResponse
 )
-from backend.schemas.risk import RiskAssessment
 
-from backend.database import get_db_session
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.db import get_session_direct
-from database.models import Account, PaymentTransaction, LedgerEntry, SimulatedPaymentMethod, PaymentStatus
+from database.models import Account, PaymentTransaction
 from engine.payment_service import (
     simulate_payment, 
     get_payment_by_idempotency_key,
-    get_payment_by_reference,
     verify_ledger_balance,
     get_account_payments
 )
@@ -307,7 +303,7 @@ async def verify_ledger(payment_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/accounts/{account_id}/payments")
-async def get_account_payments(account_id: int, limit: int = 50, db: Session = Depends(get_db)):
+async def get_account_payment_history(account_id: int, limit: int = 50, db: Session = Depends(get_db)):
     """Get payments for an account."""
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:

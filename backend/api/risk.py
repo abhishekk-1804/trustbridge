@@ -1,23 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime, timedelta
+from typing import Optional
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
-from backend.schemas.risk import RiskEventResponse, RiskAssessment, FraudRuleResult, MLAnomalyResult, RiskLevel, RiskDecision
-from backend.schemas.payments import SimulatePaymentRequest, SimulatePaymentResponse
+from backend.schemas.risk import RiskEventResponse, FraudRuleResult, MLAnomalyResult, RiskLevel
 
-from backend.database import get_db_session
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.database import get_db_session_direct
+from backend.db import get_db_session_direct
 from database.models import User, Account, Transaction, PaymentTransaction, AccountStatus
-from engine.trust_score import calculate_trust_score
-from engine.fraud_rules import detect_amount_spike, check_all_transactions, get_flagged_transactions
+from engine.fraud_rules import detect_amount_spike, get_flagged_transactions
 from engine.ml_fraud import score_all_transactions, evaluate_model, compare_rule_vs_ml, explain_anomaly
-from engine.ml_features import extract_transaction_features, build_categorical_mappings
 from engine.payment_service import assess_payment_risk
 
 router = APIRouter()
@@ -93,7 +89,7 @@ async def assess_risk(
         },
         "assessed_amount": request.amount,
         "assessed_method": request.payment_method,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -148,7 +144,7 @@ async def list_risk_events(
                 ml_result=None,
                 final_decision="flagged",
                 reason=f["reason"],
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 is_ground_truth_anomaly=False,
                 ground_truth_type=None
             ))
@@ -161,8 +157,15 @@ async def list_risk_events(
         # This is a simplified filter - in reality we'd track source better
         pass
     
-    # Sort by timestamp
-    events.sort(key=lambda x: x.timestamp, reverse=True)
+    # Sort by timestamp (normalize to naive UTC for comparison)
+    def _to_naive_utc(ts):
+        if ts is None:
+            return datetime.min.replace(tzinfo=None)
+        if hasattr(ts, 'tzinfo') and ts.tzinfo is not None:
+            return ts.astimezone(timezone.utc).replace(tzinfo=None)
+        return ts
+    
+    events.sort(key=lambda x: _to_naive_utc(x.timestamp), reverse=True)
     
     return {"events": events[:limit], "total": len(events)}
 

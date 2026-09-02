@@ -1,7 +1,6 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from database.models import Transaction, User
 import numpy as np
 import pandas as pd

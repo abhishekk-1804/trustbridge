@@ -50,7 +50,7 @@ export function Payments() {
       await simulateMutation.mutateAsync({
         sender_account_id: Number(simForm.sender_account_id),
         receiver_account_id: Number(simForm.receiver_account_id),
-        amount: Number(simForm.amount) * 100, // Convert to paise
+        amount: Number(simForm.amount),
         payment_method: simForm.payment_method as any,
         idempotency_key: simForm.idempotency_key,
       });

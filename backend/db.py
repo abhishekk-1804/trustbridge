@@ -1,13 +1,20 @@
 import os
 import sys
+import importlib.util
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from contextlib import contextmanager
 
 # Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
-from database.models import Base
+# Load project root's database.models module directly to avoid shadowing by backend.database module
+_models_path = os.path.join(PROJECT_ROOT, "database", "models.py")
+_spec = importlib.util.spec_from_file_location("database.models", _models_path)
+_db_models = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_db_models)
+Base = _db_models.Base
 
 # Use project root database
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
