@@ -170,18 +170,21 @@ export interface ModelEvaluation {
 
 export interface RuleVsMLComparison {
   comparison: {
-    both: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
-    rule_only: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
-    ml_only: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
-    neither: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
+    comparison: {
+      both: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
+      rule_only: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
+      ml_only: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
+      neither: Array<{ transaction_id: number; amount: number; timestamp: string; ground_truth: boolean }>;
+    };
+    counts: {
+      both: number;
+      rule_only: number;
+      ml_only: number;
+      neither: number;
+    };
+    total_analyzed: number;
   };
-  counts: {
-    both: number;
-    rule_only: number;
-    ml_only: number;
-    neither: number;
-  };
-  total_analyzed: number;
+  description: string;
 }
 
 export interface DashboardSummary {

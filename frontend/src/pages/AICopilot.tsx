@@ -83,9 +83,9 @@ export function AICopilot() {
 
       const data = await askCopilotMutation.mutateAsync({
         query: userQuery,
-        user_id: selectedUserId,
-        transaction_id: selectedTransactionId,
-        payment_id: selectedPaymentId,
+        user_id: selectedUserId ?? undefined,
+        transaction_id: selectedTransactionId ?? undefined,
+        payment_id: selectedPaymentId ?? undefined,
         conversation_history: conversationHistory,
       });
 
