@@ -6,15 +6,15 @@ Evaluates Isolation Forest on the Kaggle Credit Card Fraud Detection dataset.
 This is an ISOLATED benchmark - completely separate from the operational
 TrustBridge ML pipeline.
 
-Run from project root: D:\TrustBridge
-$env:PYTHONPATH="D:\TrustBridge"
-.venv\Scripts\python ml_benchmark/benchmark_runner.py
+Run from project root: D:/TrustBridge
+$env:PYTHONPATH="D:/TrustBridge"
+.venv/Scripts/python ml_benchmark/benchmark_runner.py
 """
 
 import json
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -65,7 +65,7 @@ def main():
             "dataset_path": str(DATASET_PATH),
             "status": "dataset_unavailable",
             "message": "creditcard.csv not found. Download from Kaggle to run benchmark.",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+"timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         }
         with open(RESULTS_FILE, "w") as f:
             json.dump(unavailable_result, f, indent=2)
@@ -187,7 +187,7 @@ def main():
             "tp": int(cm[1, 1]),
         },
         "status": "completed",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
         "note": "External benchmark on Kaggle PCA features (V1-V28). Not equivalent to TrustBridge production feature pipeline.",
     }
 
