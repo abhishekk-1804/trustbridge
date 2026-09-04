@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Badge } from '@/components/ui/Badge';
 import { Table, Column } from '@/components/ui/Table';
 import { Input } from '@/components/ui/Input';
-import { Shield, Search, CheckCircle, AlertTriangle, UserCheck, UserX, Clock, Eye, FileText } from 'lucide-react';
+import { Shield, Search, CheckCircle, AlertTriangle, UserCheck, UserX, Clock, Eye, FileText, AlertCircle, Info } from 'lucide-react';
 import { User } from '@/types';
 
 interface VerificationUser extends User {
@@ -43,13 +43,28 @@ export function Verification() {
     ...u,
     verification_status: u.is_verified ? 'verified' : 'pending',
     verification_date: u.is_verified ? u.account_created_at : null,
-    verification_notes: u.is_verified ? 'KYC completed' : 'Awaiting document review',
+    verification_notes: u.is_verified ? 'KYC completed (mock)' : 'Awaiting document review (mock)',
     risk_flags: [] as string[],
     trust_score: undefined,
   }));
 
   return (
     <div className="space-y-6">
+      {/* Demo Notice Banner */}
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-amber-300">Demo Only — Verification Workflow Not Implemented</p>
+            <p className="text-xs text-text-muted mt-1">
+              This page displays mock verification statuses derived from <code className="font-mono">is_verified</code>.
+              No backend verification endpoints exist. Approve/Reject actions are disabled.
+              Connect a real KYC/verification service to enable this workflow.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-text">Verifications</h1>
@@ -218,15 +233,17 @@ export function Verification() {
                       <>
                         <button
                           className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors opacity-50 cursor-not-allowed"
-                          title="Approve (demo only - no backend endpoint)"
+                          title="Approve — Not implemented (no backend endpoint)"
                           disabled
+                          aria-disabled="true"
                         >
                           <CheckCircle className="w-4 h-4" />
                         </button>
                         <button
                           className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition-colors opacity-50 cursor-not-allowed"
-                          title="Reject (demo only - no backend endpoint)"
+                          title="Reject — Not implemented (no backend endpoint)"
                           disabled
+                          aria-disabled="true"
                         >
                           <UserX className="w-4 h-4" />
                         </button>

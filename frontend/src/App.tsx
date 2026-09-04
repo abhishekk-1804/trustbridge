@@ -9,6 +9,7 @@ import { UserProfile } from '@/pages/UserProfile';
 import { RiskIntelligence } from '@/pages/RiskIntelligence';
 import { Investigations } from '@/pages/Investigations';
 import { Payments } from '@/pages/Payments';
+import { Ledger } from '@/pages/Ledger';
 import { ModelLab } from '@/pages/ModelLab';
 import { Developers } from '@/pages/Developers';
 import { Verification } from '@/pages/Verification';
@@ -37,6 +38,7 @@ function App() {
             <Route path="/risk" element={<RiskIntelligence />} />
             <Route path="/investigations/:eventId" element={<Investigations />} />
             <Route path="/payments" element={<Payments />} />
+            <Route path="/ledger/:paymentId" element={<Ledger />} />
             <Route path="/model-lab" element={<ModelLab />} />
             <Route path="/copilot" element={<AICopilot />} />
             <Route path="/developers" element={<Developers />} />

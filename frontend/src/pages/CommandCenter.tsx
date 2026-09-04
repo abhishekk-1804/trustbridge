@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useDashboardSummary, useLiveRiskFeed, useRecentTransactions } from '@/api';
+import { useDashboardSummary, useLiveRiskFeed, useRecentTransactions, useRiskActivity } from '@/api';
 import { formatCurrency, formatRelativeTime } from '@/utils';
 import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -53,6 +53,13 @@ export function CommandCenter() {
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: riskFeed, isLoading: riskLoading } = useLiveRiskFeed(5);
   const { data: recentTxns, isLoading: txnsLoading } = useRecentTransactions(10);
+  const { data: riskActivity, isLoading: riskActivityLoading, isError: riskActivityError } = useRiskActivity();
+
+  const riskActivityChartData = riskActivity?.data.map((d) => ({
+    day: new Date(d.date).toLocaleDateString('en-US', { weekday: 'short' }),
+    risk: d.risk_events,
+    transactions: d.transactions,
+  })) ?? [];
 
   const statCards = [
     { name: 'Trusted Identities', value: summary?.total_users ?? 0, icon: Users, trend: '+12%', trendUp: true, color: 'text-blue-400', bgColor: 'bg-blue-500/10' },
@@ -130,22 +137,42 @@ export function CommandCenter() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Risk Activity (7 Days)</CardTitle></CardHeader>
           <CardContent>
-            <div className="h-64 flex items-end justify-around gap-2 px-2">
-              {[
-                { day: 'Mon', events: 3 }, { day: 'Tue', events: 1 }, { day: 'Wed', events: 0 },
-                { day: 'Thu', events: 2 }, { day: 'Fri', events: 4 }, { day: 'Sat', events: 1 }, { day: 'Sun', events: 0 },
-              ].map((d) => (
-                <div key={d.day} className="flex-1 flex flex-col items-center justify-end gap-1.5">
-                  <div className="w-full bg-amber-500/60 rounded-t transition-all hover:bg-amber-500" style={{ height: `${Math.max(20, (d.events / 4) * 100)}%`, minHeight: d.events > 0 ? '24px' : '8px' }} />
-                  <span className="text-xs font-medium text-text">{d.events}</span>
-                  <span className="text-[10px] text-text-muted">{d.day}</span>
+            {riskActivityLoading ? (
+              <div className="h-64 flex items-end justify-around gap-2 px-2">
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5">
+                    <div className="w-full bg-amber-500/60 rounded-t animate-pulse" style={{ height: '50%', minHeight: '24px' }} />
+                    <span className="text-xs font-medium text-text">0</span>
+                    <span className="text-[10px] text-text-muted">Day</span>
+                  </div>
+                ))}
+              </div>
+            ) : riskActivityError ? (
+              <div className="p-4 text-text-danger text-sm">Failed to load risk activity data</div>
+            ) : riskActivityChartData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-text-muted">
+                <p>No risk activity data available</p>
+              </div>
+            ) : (
+              <>
+                <div className="h-64 flex items-end justify-around gap-2 px-2">
+                  {riskActivityChartData.map((d) => (
+                    <div key={d.day} className="flex-1 flex flex-col items-center justify-end gap-1.5">
+                      <div className="w-full bg-amber-500/60 rounded-t transition-all hover:bg-amber-500" style={{ height: `${Math.max(20, (d.risk / 10) * 100)}%`, minHeight: d.risk > 0 ? '24px' : '8px' }} />
+                      <span className="text-xs font-medium text-text">{d.risk}</span>
+                      <span className="text-[10px] text-text-muted">{d.day}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-text-muted">
-              <span>Risk Events (Amber)</span>
-              <span>Transactions (Gray)</span>
-            </div>
+                <div className="mt-4 flex items-center justify-between text-sm text-text-muted">
+                  <span>Risk Events (Amber)</span>
+                  <span>Transactions (Gray)</span>
+                </div>
+                <div className="mt-4 flex items-center justify-between text-sm text-text-muted">
+                  <span>Total Analyzed: {riskActivity?.total_analyzed ?? 0} transactions</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

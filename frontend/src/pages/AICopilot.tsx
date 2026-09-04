@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ScrollArea } from '@/components/ui/ScrollArea';
-import { Send, Bot, User, Loader2, AlertCircle, CheckCircle, Sparkles, Copy, ChevronUp, ChevronDown } from 'lucide-react';
+import { Send, Bot, User, Loader2, AlertCircle, CheckCircle, Sparkles, Copy, ChevronUp, ChevronDown, Clock, WifiOff } from 'lucide-react';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -44,6 +44,7 @@ export function AICopilot() {
   const [selectedPaymentId, setSelectedPaymentId] = useState<number | null>(null);
   const [showExamples, setShowExamples] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const { data: copilotStatusData, isLoading: statusLoading, refetch: refetchCopilotStatus } = useCopilotStatus();
@@ -66,6 +67,7 @@ export function AICopilot() {
     setInput('');
     setError(null);
     setIsLoading(true);
+    setLoadingStartTime(Date.now());
 
     const userMessage: ChatMessage = {
       role: 'user',
@@ -97,15 +99,17 @@ export function AICopilot() {
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: any) {
-      setError(err.message || 'Failed to get response from AI Copilot');
+      const errMsg = err.message || 'Failed to get response from AI Copilot';
+      setError(errMsg);
       const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: `⚠️ Error: ${err.message || 'Unknown error'}`,
+        content: `⚠️ Error: ${errMsg}`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setLoadingStartTime(null);
     }
   };
 
@@ -349,10 +353,17 @@ export function AICopilot() {
                 )}
               </ScrollArea>
 
-              {isLoading && (
+              {isLoading && loadingStartTime && (
                 <div className="p-4 border-t border-border flex items-center gap-3 bg-bg-elevated/30">
                   <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                  <span className="text-text-muted">AI is analyzing TrustBridge data...</span>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-text text-sm">Analyzing with NVIDIA NIM...</span>
+                    <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                      <Clock className="w-3 h-3 flex-shrink-0" />
+                      <span>Elapsed: {Math.floor((Date.now() - loadingStartTime) / 1000)}s</span>
+                      <span className="hidden sm:inline">• Typical response: 30-60s</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -360,7 +371,11 @@ export function AICopilot() {
                 <div className="p-4 border-t border-danger-border bg-danger-bg/50">
                   <p className="text-sm text-danger flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
-                    {error}
+                    {error.includes('timeout') || error.includes('Timeout')
+                      ? 'Request timed out. NVIDIA NIM may be experiencing high latency. Please try a simpler query or try again.'
+                      : error.includes('network') || error.includes('connect')
+                      ? 'Cannot reach AI provider. Check backend connectivity to NVIDIA NIM.'
+                      : error}
                   </p>
                 </div>
               )}
@@ -382,7 +397,7 @@ export function AICopilot() {
                   </Button>
                 </div>
                 <p className="text-xs text-text-muted mt-2">
-                  Press Enter to send, Shift+Enter for new line. AI uses server-side provider only — keys never leave backend.
+                  Press Enter to send, Shift+Enter for new line. AI uses NVIDIA NIM (Nemotron 3.5) via backend — typical latency 30-60s. Keys never leave backend.
                 </p>
               </form>
             </CardHeader>

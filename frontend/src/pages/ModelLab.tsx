@@ -5,16 +5,32 @@ import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Table, Column } from '@/components/ui/Table';
-import { RefreshCw, FlaskConical, BarChart2, Target, AlertTriangle, CheckCircle, XCircle, Search, Brain, Shield } from 'lucide-react';
+import { RefreshCw, FlaskConical, BarChart2, Target, AlertTriangle, CheckCircle, XCircle, Search, Brain, Shield, AlertCircle, WifiOff, ExternalLink, Database, Info, AlertTriangle as AlertTriangleIcon } from 'lucide-react';
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="p-4 bg-danger-bg border border-danger-border rounded-lg flex items-start gap-3">
+      <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-medium text-danger">Failed to load data</p>
+        <p className="text-xs text-text-muted mt-1">{message}</p>
+      </div>
+    </div>
+  );
+}
+
+const benchmarkTitle = 'Why PR-AUC / Precision / Recall / F1 > Accuracy';
 
 export function ModelLab() {
-  const { data: evaluation, isLoading: evalLoading, refetch: refetchEval } = useModelEvaluation();
-  const { data: comparison, isLoading: compLoading } = useRuleVsMLComparison();
+  const { data: evaluation, isLoading: evalLoading, isError: evalError, refetch: refetchEval } = useModelEvaluation();
+  const { data: comparison, isLoading: compLoading, isError: compError } = useRuleVsMLComparison();
   const { data: eventsData, isLoading: eventsLoading } = useRiskEvents(200);
 
   const events = eventsData?.events ?? [];
   const mlEvents = events.filter(e => e.ml_result?.is_anomaly);
   const ruleEvents = events.filter(e => e.rule_result?.flagged);
+
+  const modelName = evaluation?.model ?? 'Isolation Forest';
 
   return (
     <div className="space-y-6">
@@ -37,7 +53,7 @@ export function ModelLab() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-text-muted">Model</p>
-                <p className="text-lg font-bold text-text mt-1">Isolation Forest v1.0</p>
+                <p className="text-lg font-bold text-text mt-1">{modelName}</p>
               </div>
               <div className="p-3 rounded-xl bg-purple-500/10">
                 <Brain className="w-6 h-6 text-purple-400" />
@@ -82,7 +98,9 @@ export function ModelLab() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {evalLoading ? (
+            {evalError ? (
+              <ErrorBanner message="Failed to load model evaluation metrics" />
+            ) : evalLoading ? (
               <div className="h-64 animate-pulse bg-bg-elevated/50 rounded" />
             ) : evaluation ? (
               <>
@@ -163,7 +181,9 @@ export function ModelLab() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {compLoading ? (
+            {compError ? (
+              <ErrorBanner message="Failed to load rule vs ML comparison data" />
+            ) : compLoading ? (
               <div className="h-64 animate-pulse bg-bg-elevated/50 rounded" />
             ) : comparison ? (
               <>
@@ -271,6 +291,95 @@ export function ModelLab() {
             keyField="id"
             emptyMessage="No ML anomalies detected"
           />
+        </CardContent>
+      </Card>
+
+      {/* External Benchmark Validation */}
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ExternalLink className="w-5 h-5 text-amber-400" />
+            External Benchmark Validation
+            <Info className="w-4 h-4 text-amber-400" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50">
+            <p className="text-sm font-medium text-text mb-2">
+              Kaggle Credit Card Fraud Detection Dataset
+            </p>
+            <p className="text-xs text-text-muted mb-3">
+              This benchmark runs an Isolation Forest on the public Kaggle dataset
+              (284K transactions, 492 frauds, PCA features V1-V28). It is
+              <strong>completely separate</strong> from the TrustBridge operational pipeline.
+            </p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <p className="text-blue-400 font-medium">Operational TrustBridge Corpus</p>
+                <p className="text-xs text-text-muted mt-1">
+                  24 behavioural features (payment reliability, transaction consistency, account behaviour).
+                  Synthetic demo data: 399 transactions, 2 injected anomalies.
+                </p>
+              </div>
+              <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <p className="text-amber-400 font-medium">External Kaggle Benchmark</p>
+                <p className="text-xs text-text-muted mt-1">
+                  28 PCA-derived features (V1-V28) + Amount + Time. Real credit card data from Sep 2013.
+                  284,807 transactions, 492 frauds (0.17%).
+                </p>
+              </div>
+            </div>
+            <p className="text-xs text-text-muted">
+              The Kaggle feature representation <strong>differs fundamentally</strong> from production
+              transaction features. This benchmark evaluates Isolation Forest on a different data
+              distribution and feature space. It does <strong>not</strong> prove production performance.
+            </p>
+          </div>
+
+          <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50">
+            <h4 className="text-sm font-medium text-text-muted mb-3">
+              {benchmarkTitle}
+            </h4>
+            <ul className="space-y-1 text-xs text-text-muted">
+              <li><strong>Accuracy is misleading:</strong> A dummy model predicting "legitimate" for all transactions achieves ~99.83% accuracy but catches 0% fraud.</li>
+              <li><strong>Precision:</strong> Of predicted frauds, how many are actually fraud?</li>
+              <li><strong>Recall:</strong> Of actual frauds, how many did we catch?</li>
+              <li><strong>F1:</strong> Harmonic mean of precision and recall.</li>
+              <li><strong>PR-AUC:</strong> Area under Precision-Recall curve; robust to extreme class imbalance.</li>
+              <li><strong>ROC-AUC:</strong> Also informative but can be optimistic on imbalanced data.</li>
+            </ul>
+          </div>
+
+          <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50">
+            <p className="text-sm font-medium text-text mb-2">Benchmark Status</p>
+            <div className="flex items-center gap-3 text-sm">
+              <AlertTriangleIcon className="w-4 h-4 text-amber-400" />
+              <span className="text-text">
+                External benchmark available as an offline evaluation module.
+                Run the benchmark with the public Kaggle dataset to populate results.
+              </span>
+            </div>
+            <p className="text-xs text-text-muted mt-2">
+              To run: <code className="font-mono bg-bg-elevated px-1.5 py-0.5 rounded">
+                .venv\Scripts\python ml_benchmark/benchmark_runner.py
+              </code>
+              (requires creditcard.csv from Kaggle in ml_benchmark/)
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <p className="text-xs text-text-subtle">
+              <a
+                href="https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                Download Kaggle Credit Card Fraud Dataset
+              </a>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -8,7 +8,7 @@ import { Table, Column } from '@/components/ui/Table';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
-import { CreditCard, ArrowLeftRight, RefreshCw, Search, List, Hash, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { CreditCard, ArrowLeftRight, RefreshCw, Search, List, Hash, CheckCircle, XCircle, AlertTriangle, ChevronRight } from 'lucide-react';
 
 const PAYMENT_METHODS = [
   { value: 'upi_simulated', label: 'UPI (Simulated)' },
@@ -37,9 +37,14 @@ export function Payments() {
   });
   const [simError, setSimError] = React.useState('');
   const [simSuccess, setSimSuccess] = React.useState(false);
+  const [ledgerPaymentId, setLedgerPaymentId] = React.useState<number | null>(null);
+  const [verifyPaymentId, setVerifyPaymentId] = React.useState<number | null>(null);
+  const [verifyResult, setVerifyResult] = React.useState<any>(null);
 
   const { data: paymentsData, isLoading, refetch } = usePayments(50, 0, statusFilter || undefined);
   const simulateMutation = useSimulatePayment();
+  const { data: ledgerData, isLoading: ledgerLoading } = useLedger(ledgerPaymentId ?? 0);
+  const verifyMutation = useVerifyLedger(verifyPaymentId ?? 0);
 
   const handleSimulate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +67,144 @@ export function Payments() {
     }
   };
 
+  const handleViewLedger = (paymentId: number) => {
+    setLedgerPaymentId(paymentId);
+    setVerifyPaymentId(null);
+    setVerifyResult(null);
+  };
+
+  const handleVerifyLedger = async (paymentId: number) => {
+    setVerifyPaymentId(paymentId);
+    setLedgerPaymentId(null);
+    try {
+      const result = await verifyMutation.mutateAsync();
+      setVerifyResult(result);
+    } catch (err: any) {
+      setVerifyResult({ error: err.message || 'Verification failed' });
+    }
+  };
+
+  const closeLedger = () => {
+    setLedgerPaymentId(null);
+    setVerifyPaymentId(null);
+    setVerifyResult(null);
+  };
+
   const payments = paymentsData ?? [];
+
+const renderLedgerSection = () => {
+    if (!ledgerPaymentId && !verifyPaymentId) return null;
+
+    return (
+      <Card className="relative">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <List className="w-5 h-5" />
+            {ledgerPaymentId ? 'Ledger Entries' : 'Ledger Verification'}
+          </CardTitle>
+          <button onClick={closeLedger} className="p-1.5 text-text-muted hover:text-text transition-colors" title="Close">
+            <XCircle className="w-5 h-5" />
+          </button>
+        </CardHeader>
+        <CardContent>
+          {ledgerPaymentId ? (
+            <div>
+              {ledgerLoading ? (
+                <div className="h-64 animate-pulse bg-bg-elevated/50 rounded" />
+              ) : ledgerData && ledgerData.length > 0 ? (
+                <Table
+                  data={ledgerData}
+                  columns={[
+                    { key: 'entry_type', header: 'Type', render: (row) => (
+                      <Badge variant={row.entry_type === 'debit' ? 'info' : 'success'}>{row.entry_type.toUpperCase()}</Badge>
+                    ), className: 'w-24' },
+                    { key: 'account_id', header: 'Account', render: (row) => <span className="font-mono text-sm">#{row.account_id}</span>, className: 'w-24' },
+                    { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount), className: 'w-28' },
+                    { key: 'balance_after', header: 'Balance After', render: (row) => formatCurrency(row.balance_after), className: 'w-32' },
+                    { key: 'description', header: 'Description', render: (row) => row.description ?? '—', className: 'w-48' },
+                    { key: 'created_at', header: 'Time', render: (row) => formatRelativeTime(row.created_at), className: 'w-36' },
+                  ]}
+                  keyField="id"
+                  emptyMessage="No ledger entries found"
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <List className="w-12 h-12 text-text-muted mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-text">No ledger entries</h3>
+                  <p className="text-text-muted mt-2">This payment has no ledger entries</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {verifyMutation.isPending ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+                  <span className="ml-3 text-text-muted">Verifying ledger...</span>
+                </div>
+              ) : verifyResult ? (
+                <>
+                  {verifyResult.error ? (
+                    <div className="p-4 bg-danger-bg border border-danger-border rounded-lg">
+                      <p className="text-sm text-danger flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        {verifyResult.error}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-primary-bg border border-primary-border rounded-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <CheckCircle className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-medium text-text">Ledger Verified</h3>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-text-muted">Balanced</p>
+                          <p className="font-mono text-text">{verifyResult.is_balanced ? 'Yes' : 'No'}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Total Debits</p>
+                          <p className="font-mono text-text">{formatCurrency(verifyResult.total_debits)}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Total Credits</p>
+                          <p className="font-mono text-text">{formatCurrency(verifyResult.total_credits)}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Entry Count</p>
+                          <p className="font-mono text-text">{verifyResult.entry_count}</p>
+                        </div>
+                      </div>
+                      {verifyResult.entries && verifyResult.entries.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border">
+                          <h4 className="text-sm font-medium text-text-muted mb-2">Entries</h4>
+                          <Table
+                            data={verifyResult.entries}
+                            columns={[
+                              { key: 'account_id', header: 'Account', render: (row) => <span className="font-mono text-sm">#{row.account_id}</span> },
+                              { key: 'entry_type', header: 'Type', render: (row) => (
+                                <Badge variant={row.entry_type === 'debit' ? 'info' : 'success'}>{row.entry_type.toUpperCase()}</Badge>
+                              ) },
+                              { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) },
+                              { key: 'balance_after', header: 'Balance After', render: (row) => formatCurrency(row.balance_after) },
+                            ]}
+                            keyField="account_id"
+                            emptyMessage="No entries"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-text-muted">Click verify to check ledger balance</div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -248,10 +390,18 @@ export function Payments() {
                   ) : '—', className: 'w-32' },
                   { key: 'actions', header: '', render: (row) => (
                     <div className="flex items-center gap-2">
-                      <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="View Ledger">
+                      <button
+                        onClick={() => handleViewLedger(row.id)}
+                        className="p-1.5 text-text-muted hover:text-primary transition-colors"
+                        title="View Ledger"
+                      >
                         <Hash className="w-4 h-4" />
                       </button>
-                      <button className="p-1.5 text-text-muted hover:text-primary transition-colors" title="Verify Ledger">
+                      <button
+                        onClick={() => handleVerifyLedger(row.id)}
+                        className="p-1.5 text-text-muted hover:text-primary transition-colors"
+                        title="Verify Ledger"
+                      >
                         <CheckCircle className="w-4 h-4" />
                       </button>
                     </div>
@@ -263,6 +413,8 @@ export function Payments() {
             )}
           </CardContent>
         </Card>
-      </div>
+
+      {renderLedgerSection()}
+    </div>
   );
 }

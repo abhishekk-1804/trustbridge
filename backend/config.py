@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     ai_model: str = "gpt-4o-mini"
     ai_max_tokens: int = 2000
     ai_temperature: float = 0.3
-    ai_timeout_seconds: int = 30
+    ai_timeout_seconds: int = 120
     ai_base_url: Optional[str] = None
 
     # ML Model

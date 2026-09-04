@@ -1,0 +1,33 @@
+# TrustBridge External Benchmark - Ignored Files
+
+# Dataset (NOT bundled in git - must be downloaded from Kaggle)
+creditcard.csv
+*.zip
+*.gz
+*.tar
+*.rar
+
+# Results (generated only when real dataset is evaluated)
+results/benchmark_results.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

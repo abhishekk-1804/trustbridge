@@ -6,15 +6,15 @@ import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Table, Column } from '@/components/ui/Table';
-import { ArrowLeft, User, CreditCard, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, CreditCard, Activity, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
 
 export function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
   const id = Number(userId);
-  const { data: user, isLoading: userLoading } = useUser(id);
-  const { data: trust, isLoading: trustLoading } = useUserTrust(id);
-  const { data: txns, isLoading: txnsLoading } = useUserTransactions(id, 20);
-  const { data: payments, isLoading: paymentsLoading } = useUserPayments(id);
+  const { data: user, isLoading: userLoading, error: userError } = useUser(id);
+  const { data: trust, isLoading: trustLoading, error: trustError } = useUserTrust(id);
+  const { data: txns, isLoading: txnsLoading, error: txnsError } = useUserTransactions(id, 20);
+  const { data: payments, isLoading: paymentsLoading, error: paymentsError } = useUserPayments(id);
 
   if (userLoading) {
     return (
@@ -38,7 +38,7 @@ export function UserProfile() {
     );
   }
 
-  if (!user) {
+  if (userError || !user) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -48,7 +48,7 @@ export function UserProfile() {
         </div>
         <Card>
           <CardContent className="py-12 text-center">
-            <User className="w-12 h-12 text-text-muted mx-auto mb-4" />
+            <AlertCircle className="w-12 h-12 text-text-danger mx-auto mb-4" />
             <h2 className="text-lg font-medium text-text">User not found</h2>
             <p className="text-text-muted mt-2">The requested user profile does not exist.</p>
             <Link to="/trust" className="mt-4 inline-flex items-center gap-2 text-primary hover:underline">
@@ -150,23 +150,33 @@ export function UserProfile() {
             <CardTitle className="text-base">Trust Components</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {Object.entries(components).map(([key, comp]: [string, any]) => (
-                <div key={key}>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-text-muted">{key.replace('_', ' ')}</span>
-                    <span className="font-medium text-text">{comp.score}/100</span>
+            {trustLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-8 animate-pulse bg-bg-elevated rounded" />
+                ))}
+              </div>
+            ) : trustError ? (
+              <div className="p-4 text-text-danger text-sm">Failed to load trust components</div>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(components).map(([key, comp]: [string, any]) => (
+                  <div key={key}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-text-muted">{key.replace('_', ' ')}</span>
+                      <span className="font-medium text-text">{comp.score}/100</span>
+                    </div>
+                    <div className="h-2 bg-bg-elevated rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-500"
+                        style={{ width: `${comp.score}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-text-muted mt-1">Weight: {(comp.weight * 100).toFixed(0)}% • Contribution: {comp.contribution.toFixed(1)}</p>
                   </div>
-                  <div className="h-2 bg-bg-elevated rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{ width: `${comp.score}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-text-muted mt-1">Weight: {(comp.weight * 100).toFixed(0)}% • Contribution: {comp.contribution.toFixed(1)}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -178,19 +188,25 @@ export function UserProfile() {
             <Badge variant="info">{txns?.total ?? 0} total</Badge>
           </CardHeader>
           <CardContent>
-            <Table
-              data={txns?.transactions ?? []}
-              columns={[
-                { key: 'time', header: 'Time', render: (row) => formatRelativeTime(row.timestamp) },
-                { key: 'transaction_type', header: 'Type', render: (row) => <Badge variant={row.transaction_type === 'debit' ? 'info' : 'success'}>{row.transaction_type.toUpperCase()}</Badge> },
-                { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) },
-                { key: 'merchant_name', header: 'Merchant', render: (row) => row.merchant_name ?? '—' },
-                { key: 'status', header: 'Status', render: (row) => <Badge variant={getStatusColor(row.status).includes('emerald') ? 'success' : 'danger'}>{row.status}</Badge> },
-                { key: 'risk', header: 'Risk', render: (row) => <Badge variant={row.is_anomaly ? 'danger' : 'success'}>{row.is_anomaly ? 'Anomaly' : 'Normal'}</Badge> },
-              ]}
-              keyField="id"
-              emptyMessage="No transactions found"
-            />
+            {txnsLoading ? (
+              <div className="h-64 animate-pulse bg-bg-elevated/50 rounded" />
+            ) : txnsError ? (
+              <div className="p-4 text-text-danger text-sm">Failed to load transactions</div>
+            ) : (
+              <Table
+                data={txns?.transactions ?? []}
+                columns={[
+                  { key: 'time', header: 'Time', render: (row) => formatRelativeTime(row.timestamp) },
+                  { key: 'transaction_type', header: 'Type', render: (row) => <Badge variant={row.transaction_type === 'debit' ? 'info' : 'success'}>{row.transaction_type.toUpperCase()}</Badge> },
+                  { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount) },
+                  { key: 'merchant_name', header: 'Merchant', render: (row) => row.merchant_name ?? '—' },
+                  { key: 'status', header: 'Status', render: (row) => <Badge variant={getStatusColor(row.status).includes('emerald') ? 'success' : 'danger'}>{row.status}</Badge> },
+                  { key: 'risk', header: 'Risk', render: (row) => <Badge variant={row.is_anomaly ? 'danger' : 'success'}>{row.is_anomaly ? 'Anomaly' : 'Normal'}</Badge> },
+                ]}
+                keyField="id"
+                emptyMessage="No transactions found"
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -200,7 +216,11 @@ export function UserProfile() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {payments && (payments.sent.length > 0 || payments.received.length > 0) ? (
+              {paymentsLoading ? (
+                <div className="h-64 animate-pulse bg-bg-elevated/50 rounded" />
+              ) : paymentsError ? (
+                <div className="p-4 text-text-danger text-sm">Failed to load payments</div>
+              ) : payments && (payments.sent.length > 0 || payments.received.length > 0) ? (
                 <>
                   {payments.sent.length > 0 && (
                     <div>

@@ -5,3 +5,7 @@ __pycache__/
 *.db
 .env
 models/
+
+.env.txt
+copilot_response.txt
+*.tsbuildinfo

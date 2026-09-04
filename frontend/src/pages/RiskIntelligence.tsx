@@ -6,14 +6,26 @@ import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Table, Column } from '@/components/ui/Table';
-import { AlertTriangle, Search, FlaskConical, RefreshCw, Filter } from 'lucide-react';
+import { AlertTriangle, Search, FlaskConical, RefreshCw, Filter, AlertCircle, WifiOff } from 'lucide-react';
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="p-4 bg-danger-bg border border-danger-border rounded-lg flex items-start gap-3">
+      <AlertCircle className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-medium text-danger">Failed to load data</p>
+        <p className="text-xs text-text-muted mt-1">{message}</p>
+      </div>
+    </div>
+  );
+}
 
 export function RiskIntelligence() {
   const [riskLevel, setRiskLevel] = React.useState<string | undefined>();
   const [source, setSource] = React.useState<string | undefined>();
-  const { data: eventsData, isLoading: eventsLoading, refetch } = useRiskEvents(100, riskLevel, source);
-  const { data: evaluation, isLoading: evalLoading } = useModelEvaluation();
-  const { data: comparison, isLoading: compLoading } = useRuleVsMLComparison();
+  const { data: eventsData, isLoading: eventsLoading, isError: eventsError, refetch } = useRiskEvents(100, riskLevel, source);
+  const { data: evaluation, isLoading: evalLoading, isError: evalError } = useModelEvaluation();
+  const { data: comparison, isLoading: compLoading, isError: compError } = useRuleVsMLComparison();
 
   const events = eventsData?.events ?? [];
 
@@ -31,7 +43,7 @@ export function RiskIntelligence() {
     { value: 'both', label: 'Both' },
   ];
 
-  if (eventsLoading) {
+  if (eventsLoading && !eventsData) {
     return (
       <div className="space-y-6">
         <div>
@@ -90,45 +102,57 @@ export function RiskIntelligence() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-muted">Total Risk Events</p>
-                <p className="text-3xl font-bold text-text mt-1">{eventsData?.total ?? events.length}</p>
+            {eventsError ? (
+              <ErrorBanner message="Failed to load risk events stream" />
+            ) : (
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-muted">Total Risk Events</p>
+                  <p className="text-3xl font-bold text-text mt-1">{eventsData?.total ?? events.length}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-amber-500/10">
+                  <AlertTriangle className="w-6 h-6 text-amber-400" />
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-amber-500/10">
-                <AlertTriangle className="w-6 h-6 text-amber-400" />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-muted">ML Anomalies Detected</p>
-                <p className="text-3xl font-bold text-text mt-1">
-                  {evaluation?.evaluation?.anomalies_detected ?? '—'}
-                </p>
+            {evalError ? (
+              <ErrorBanner message="Failed to load model evaluation metrics" />
+            ) : (
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-muted">ML Anomalies Detected</p>
+                  <p className="text-3xl font-bold text-text mt-1">
+                    {evaluation?.evaluation?.anomalies_detected ?? '—'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-blue-500/10">
+                  <FlaskConical className="w-6 h-6 text-blue-400" />
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-blue-500/10">
-                <FlaskConical className="w-6 h-6 text-blue-400" />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-muted">Model F1 Score</p>
-                <p className="text-3xl font-bold text-text mt-1">
-                  {(evaluation?.evaluation?.f1 ? (evaluation.evaluation.f1 * 100).toFixed(1) : '—') + '%'}
-                </p>
+            {evalError ? (
+              <ErrorBanner message="Failed to load model evaluation metrics" />
+            ) : (
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-muted">Model F1 Score</p>
+                  <p className="text-3xl font-bold text-text mt-1">
+                    {(evaluation?.evaluation?.f1 ? (evaluation.evaluation.f1 * 100).toFixed(1) : '—') + '%'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-500/10">
+                  <Search className="w-6 h-6 text-emerald-400" />
+                </div>
               </div>
-              <div className="p-3 rounded-xl bg-emerald-500/10">
-                <Search className="w-6 h-6 text-emerald-400" />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -140,34 +164,38 @@ export function RiskIntelligence() {
             <Badge variant="info">{events.length} showing</Badge>
           </CardHeader>
           <CardContent>
-            <Table
-              data={events}
-              columns={[
-                { key: 'time', header: 'Time', render: (row) => formatRelativeTime(row.timestamp), className: 'w-28' },
-                { key: 'user', header: 'User', render: (row) => (
-                  <Link to={`/trust/${row.user_id}`} className="font-medium text-text hover:text-primary">
-                    {row.user_name}
-                  </Link>
-                )},
-                { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount), className: 'w-32' },
-                { key: 'type', header: 'Type', render: (row) => <Badge variant="info">{row.transaction_type.toUpperCase()}</Badge>, className: 'w-24' },
-                { key: 'risk', header: 'Risk', render: (row) => (
-                  <Badge className={getRiskLevelColor(row.risk_level)}>{getRiskLevelLabel(row.risk_level)}</Badge>
-                ), className: 'w-28' },
-                { key: 'source', header: 'Source', render: (row) => (
-                  <Badge variant={row.rule_result && row.ml_result ? 'warning' : row.rule_result ? 'info' : 'neutral'}>
-                    {row.rule_result && row.ml_result ? 'Both' : row.rule_result ? 'Rule' : 'ML'}
-                  </Badge>
-                ), className: 'w-24' },
-                { key: 'action', header: '', render: (row) => (
-                  <Link to={`/investigations/${row.id}`} className="text-primary hover:underline text-sm">
-                    Investigate
-                  </Link>
-                ), className: 'w-28' },
-              ]}
-              keyField="id"
-              emptyMessage="No risk events found"
-            />
+            {eventsError ? (
+              <ErrorBanner message="Failed to load risk events stream" />
+            ) : (
+              <Table
+                data={events}
+                columns={[
+                  { key: 'time', header: 'Time', render: (row) => formatRelativeTime(row.timestamp), className: 'w-28' },
+                  { key: 'user', header: 'User', render: (row) => (
+                    <Link to={`/trust/${row.user_id}`} className="font-medium text-text hover:text-primary">
+                      {row.user_name}
+                    </Link>
+                  )},
+                  { key: 'amount', header: 'Amount', render: (row) => formatCurrency(row.amount), className: 'w-32' },
+                  { key: 'type', header: 'Type', render: (row) => <Badge variant="info">{row.transaction_type.toUpperCase()}</Badge>, className: 'w-24' },
+                  { key: 'risk', header: 'Risk', render: (row) => (
+                    <Badge className={getRiskLevelColor(row.risk_level)}>{getRiskLevelLabel(row.risk_level)}</Badge>
+                  ), className: 'w-28' },
+                  { key: 'source', header: 'Source', render: (row) => (
+                    <Badge variant={row.rule_result && row.ml_result ? 'warning' : row.rule_result ? 'info' : 'neutral'}>
+                      {row.rule_result && row.ml_result ? 'Both' : row.rule_result ? 'Rule' : 'ML'}
+                    </Badge>
+                  ), className: 'w-24' },
+                  { key: 'action', header: '', render: (row) => (
+                    <Link to={`/investigations/${row.id}`} className="text-primary hover:underline text-sm">
+                      Investigate
+                    </Link>
+                  ), className: 'w-28' },
+                ]}
+                keyField="id"
+                emptyMessage="No risk events found"
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -176,7 +204,9 @@ export function RiskIntelligence() {
             <CardTitle>Model Performance</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {evaluation ? (
+            {evalError ? (
+              <ErrorBanner message="Failed to load model evaluation metrics" />
+            ) : evaluation ? (
               <>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50">
@@ -218,7 +248,9 @@ export function RiskIntelligence() {
           <CardTitle>Rule vs ML Comparison</CardTitle>
         </CardHeader>
         <CardContent>
-          {comparison ? (
+          {compError ? (
+            <ErrorBanner message="Failed to load rule vs ML comparison data" />
+          ) : comparison ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-bg-elevated/50 rounded-lg border border-border/50 text-center">
                 <p className="text-2xl font-bold text-text">{comparison.comparison?.counts?.both ?? 0}</p>

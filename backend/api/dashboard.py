@@ -128,7 +128,7 @@ async def get_risk_activity(db: Session = Depends(get_db)):
             "transactions": txn_by_date.get(date_str, 0)
         })
     
-    return {"data": list(reversed(data))}
+    return {"data": list(reversed(data)), "total_analyzed": sum(txn_by_date.values())}
 
 
 @router.get("/dashboard/live-risk-feed")

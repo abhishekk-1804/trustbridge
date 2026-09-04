@@ -31,7 +31,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: 130000,
     });
 
     this.client.interceptors.request.use(
@@ -59,7 +59,7 @@ class ApiClient {
     return data;
   }
 
-  async getRiskActivity(): Promise<{ data: Array<{ date: string; risk_events: number; transactions: number }> }> {
+  async getRiskActivity(): Promise<{ data: Array<{ date: string; risk_events: number; transactions: number }>; total_analyzed: number }> {
     const { data } = await this.client.get('/dashboard/risk-activity');
     return data;
   }
@@ -247,6 +247,14 @@ export function useRecentTransactions(limit = 20) {
   return useQuery({
     queryKey: ['dashboard', 'recent-transactions', limit],
     queryFn: () => api.getRecentTransactions(limit),
+    refetchInterval: 30000,
+  });
+}
+
+export function useRiskActivity() {
+  return useQuery({
+    queryKey: ['dashboard', 'risk-activity'],
+    queryFn: () => api.getRiskActivity(),
     refetchInterval: 30000,
   });
 }
