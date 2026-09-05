@@ -310,6 +310,118 @@ cd frontend && npm run build
 
 ---
 
+## Security & Production Architecture Boundaries
+
+TrustBridge is engineered as a high-fidelity internal risk and fraud
+intelligence platform. The architecture emphasizes financial accounting
+invariants, machine-learning auditability, grounded advisory AI, and
+human-controlled investigation workflows.
+
+For controlled demonstration and architectural clarity, the current build
+deliberately defines the following boundaries:
+
+### 1. Authentication & Identity Isolation
+
+- The demonstration API does not currently implement JWT, OAuth/OIDC,
+  session-based authentication, or application-level user authentication.
+- API endpoints therefore operate in a controlled/demo context rather than
+  as an unrestricted public financial service.
+- `InvestigationCase.analyst_id` remains nullable in the current build because
+  authenticated analyst identity is not implemented.
+- Production deployment would require an authenticated identity boundary,
+  such as an API gateway validating OIDC/JWT credentials and propagating
+  verified identity claims to the application.
+
+### 2. Authorization & Role Isolation
+
+- Role-based authorization is not implemented in the current demonstration
+  build.
+- Investigation and payment operations should therefore be considered
+  controlled-demo capabilities rather than production-grade multi-tenant
+  authorization boundaries.
+- A production deployment would require explicit roles/permissions,
+  user isolation, and authorization checks on protected resources.
+
+### 3. Polymorphic Risk References
+
+- `InvestigationCase` references the underlying risk event through the
+  application-level compound key `(risk_event_id, risk_event_type)`.
+- The current implementation supports risk events originating from the
+  supported transaction/payment domains without introducing an artificial
+  database foreign key across multiple entity types.
+- Referential existence is validated at the application layer.
+- The compound uniqueness constraint prevents duplicate investigation cases
+  for the same risk-event/type pair.
+- Production schema evolution could replace or further formalize this
+  relationship depending on the persistence architecture.
+
+### 4. Strict AI Advisory Perimeter
+
+- The AI Copilot is an advisory explanation layer.
+- It receives grounded TrustBridge context and produces explanatory text.
+- It has no tool/function-calling capability that can mutate TrustBridge
+  state.
+- It cannot approve, reject, escalate, dismiss, resolve, block, or otherwise
+  execute financial or investigation actions.
+- Human-controlled investigation disposition remains separate from AI output.
+- Trust Score and transaction-level Fraud Risk remain separate concepts;
+  the AI does not replace either underlying deterministic/model-based
+  decision process.
+
+### 5. Deterministic Payment & Accounting Controls
+
+- Payment simulation uses idempotency controls and atomic database
+  transactions.
+- Ledger entries follow the application's double-entry accounting model.
+- Monetary amounts are represented internally in minor currency units
+  (paise) and converted at the API/display boundary.
+- Ledger verification is separate from AI-generated explanations.
+- AI output cannot mutate payment or ledger state.
+
+### 6. Auditability
+
+- Investigation cases maintain persistent workflow state.
+- Meaningful case creation and state changes are recorded through the
+  append-only audit-log mechanism.
+- The audit trail is separate from AI-generated explanations and risk
+  detection output.
+
+### 7. Production Hardening Requirements
+
+The current build is intended for controlled demonstration and evaluation,
+not unrestricted production financial use.
+
+A production deployment would additionally require, at minimum:
+
+- authenticated identity and authorization/RBAC
+- user/tenant isolation
+- production-specific CORS configuration
+- managed secret storage and deployment configuration
+- database migration management
+- stronger operational monitoring and alerting
+- production infrastructure, network, and deployment controls
+- security testing appropriate to the deployment environment
+
+These are deliberate production-boundary requirements, not claims that those
+capabilities are implemented in the current demonstration build.
+
+---
+
+### CORS & Debug Configuration Boundary
+
+- Debug now defaults to `False` in application settings.
+- CORS origins are configurable through application settings/environment.
+- Development defaults include the local frontend origins
+  (`http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`).
+- Production deployments must explicitly configure trusted origins via
+  the `CORS_ORIGINS` environment variable (comma-separated or JSON list).
+- Debug mode defaults to `False` and should remain `False` in production.
+- CORS `allow_headers` is restricted to a minimal explicit set
+  (`Content-Type`, `Authorization`, `Accept`, `X-Requested-With`,
+  `X-Idempotency-Key`) rather than the wildcard `["*"]`.
+
+---
+
 ## Deployment
 
 ### Backend (Render / Railway / Fly.io)
