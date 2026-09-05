@@ -1,20 +1,157 @@
 import * as React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useRiskEvent, useExplainRisk } from '@/api';
+import { useInvestigationCase, useCreateInvestigationCase, useUpdateInvestigationCase, useInvestigationAuditLog } from '@/api';
 import { formatCurrency, formatRelativeTime, formatDate, getRiskLevelColor, getRiskLevelLabel, getStatusColor } from '@/utils';
 import { cn } from '@/utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Table, Column } from '@/components/ui/Table';
-import { ArrowLeft, AlertTriangle, Search, User, DollarSign, CreditCard, Shield, Clock, MapPin, Tag, Info, CheckCircle } from 'lucide-react';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { Textarea } from '@/components/ui/Textarea';
+import { ArrowLeft, AlertTriangle, Search, User, DollarSign, CreditCard, Shield, Clock, MapPin, Tag, Info, CheckCircle, ChevronRight, ChevronLeft, FileText, Pencil, Save, X, Loader2, ArrowRight, Plus } from 'lucide-react';
+import type { CaseStatus, CaseDecision, InvestigationCase } from '@/types';
+
+const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
+  pending: 'Pending',
+  under_review: 'Under Review',
+  resolved: 'Resolved',
+  escalated: 'Escalated',
+  dismissed: 'Dismissed',
+};
+
+const CASE_DECISION_LABELS: Record<CaseDecision, string> = {
+  true_positive: 'True Positive',
+  false_positive: 'False Positive',
+  inconclusive: 'Inconclusive',
+  escalated: 'Escalated',
+};
+
+const STATUS_TRANSITIONS: Record<CaseStatus, CaseStatus[]> = {
+  pending: ['under_review', 'escalated', 'dismissed'],
+  under_review: ['pending', 'resolved', 'escalated', 'dismissed'],
+  resolved: [],
+  escalated: ['resolved', 'dismissed'],
+  dismissed: [],
+};
+
+const DECISION_OPTIONS_BY_STATUS: Record<CaseStatus, (CaseDecision | null)[]> = {
+  pending: [null],
+  under_review: [null],
+  resolved: ['true_positive', 'false_positive', 'inconclusive'],
+  escalated: ['escalated', null],
+  dismissed: ['false_positive', null],
+};
 
 export function Investigations() {
   const { eventId } = useParams<{ eventId: string }>();
-  const id = Number(eventId);
-  const { data: event, isLoading, error } = useRiskEvent(id);
-  const { data: explanation, isLoading: explainLoading } = useExplainRisk(id);
+  const riskEventId = Number(eventId);
 
-  if (isLoading) {
+  // Risk event evidence (read-only)
+  const { data: event, isLoading: eventLoading, error: eventError } = useRiskEvent(riskEventId);
+  const { data: explanation, isLoading: explainLoading } = useExplainRisk(riskEventId);
+
+  // Investigation case state
+  const [caseId, setCaseId] = React.useState<number | null>(null);
+  const [showCreateCase, setShowCreateCase] = React.useState(false);
+  const [isCreatingCase, setIsCreatingCase] = React.useState(false);
+
+  // Determine risk event type and ID for case creation
+  const riskEventType = event?.type === 'payment' ? 'payment' : 'transaction';
+
+  // Case data and mutations
+  const { data: investigationCase, isLoading: caseLoading, error: caseError, refetch: refetchCase } =
+    useInvestigationCase(caseId ?? 0);
+
+  const createCaseMutation = useCreateInvestigationCase();
+  const updateCaseMutation = useUpdateInvestigationCase();
+  const { data: auditLogs, isLoading: auditLoading } = useInvestigationAuditLog(caseId ?? 0);
+
+  // Local state for form
+  const [status, setStatus] = React.useState<InvestigationCase['status']>('pending');
+  const [decision, setDecision] = React.useState<InvestigationCase['decision']>(null);
+  const [notes, setNotes] = React.useState('');
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveError, setSaveError] = React.useState<string | null>(null);
+
+  // Sync local state with investigation case when it loads
+  React.useEffect(() => {
+    if (investigationCase) {
+      setStatus(investigationCase.status);
+      setDecision(investigationCase.decision);
+      setNotes(investigationCase.notes ?? '');
+    }
+  }, [investigationCase]);
+
+  const handleCreateCase = async () => {
+    if (!riskEventId) return;
+    setIsCreatingCase(true);
+    setSaveError(null);
+    try {
+      const newCase = await createCaseMutation.mutateAsync({
+        risk_event_id: riskEventId,
+        risk_event_type: riskEventType,
+      });
+      setCaseId(newCase.id);
+      setShowCreateCase(false);
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to create investigation case');
+    } finally {
+      setIsCreatingCase(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!caseId) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await updateCaseMutation.mutateAsync({
+        caseId,
+        update: { status, decision: decision ?? undefined, notes },
+      });
+      await refetchCase();
+    } catch (err: any) {
+      setSaveError(err.message || 'Failed to save investigation case');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleStatusChange = (newStatus: CaseStatus) => {
+    setStatus(newStatus);
+    // Auto-set decision based on status rules
+    if (newStatus === 'resolved' && !['true_positive', 'false_positive', 'inconclusive'].includes(decision ?? '')) {
+      setDecision('true_positive');
+    } else if (newStatus === 'escalated' && decision !== 'escalated') {
+      setDecision('escalated');
+    } else if (newStatus === 'dismissed' && decision !== 'false_positive') {
+      setDecision('false_positive');
+    } else if (newStatus === 'pending' || newStatus === 'under_review') {
+      setDecision(null);
+    }
+  };
+
+  const handleDecisionChange = (newDecision: CaseDecision | null) => {
+    setDecision(newDecision);
+  };
+
+  const handleNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNotes(e.target.value);
+  };
+
+  const getDecisionLabel = (d: CaseDecision | null) => {
+    if (!d) return '—';
+    return CASE_DECISION_LABELS[d];
+  };
+
+  const getStatusLabel = (s: CaseStatus) => {
+    return CASE_STATUS_LABELS[s];
+  };
+
+  if (eventLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -36,7 +173,7 @@ export function Investigations() {
     );
   }
 
-  if (error || !event) {
+  if (eventError || !event) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -62,6 +199,10 @@ export function Investigations() {
   const isPayment = event.type === 'payment';
   const riskLevel = event.risk_level || event.ml_result?.risk_level || 'unknown';
 
+  // Determine if we should show case creation prompt
+  const hasCase = !!caseId;
+  const caseExistsForEvent = caseId && investigationCase?.risk_event_id === riskEventId;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -84,6 +225,239 @@ export function Investigations() {
           </Badge>
         </div>
       </div>
+
+      {/* Case Management Section */}
+      <Card className="border-primary/30 bg-primary-bg/30">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Investigation Case
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {caseLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {hasCase && investigationCase && (
+              <Badge variant={
+                investigationCase.status === 'resolved' ? 'success' :
+                investigationCase.status === 'dismissed' ? 'danger' :
+                investigationCase.status === 'escalated' ? 'warning' :
+                investigationCase.status === 'under_review' ? 'info' : 'neutral'
+              } className="gap-1">
+                {CASE_STATUS_LABELS[investigationCase.status]}
+              </Badge>
+            )}
+            {hasCase ? (
+              <>
+                {investigationCase?.decision && (
+                  <Badge variant="neutral" className="gap-1">
+                    {CASE_DECISION_LABELS[investigationCase.decision!]}
+                  </Badge>
+                )}
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={() => setShowCreateCase(true)}
+                disabled={isCreatingCase}
+              >
+                <Plus className="w-4 h-4" />
+                Create Investigation Case
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {saveError && (
+            <div className="p-4 bg-danger-bg border border-danger-border rounded-lg text-sm text-danger flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {saveError}
+            </div>
+          )}
+
+          {!hasCase && !showCreateCase && (
+            <div className="p-6 bg-bg-elevated/50 border border-border/50 rounded-lg text-center">
+              <FileText className="w-12 h-12 text-text-muted mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-text mb-2">No Investigation Case Yet</h3>
+              <p className="text-text-muted mb-4">
+                Create an investigation case to track the analyst workflow for this risk event.
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => setShowCreateCase(true)}
+                disabled={isCreatingCase}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Investigation Case
+              </Button>
+            </div>
+          )}
+
+          {showCreateCase && !hasCase && (
+            <div className="p-4 bg-primary-bg border border-primary-border rounded-lg space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-text">Create Investigation Case</h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowCreateCase(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-sm text-text-muted">
+                This will create an investigation case for risk event <strong>#{riskEventId}</strong> ({riskEventType}).
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="primary"
+                  onClick={handleCreateCase}
+                  disabled={isCreatingCase}
+                >
+                  {isCreatingCase ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Investigation Case
+                    </>
+                  )}
+                </Button>
+                <Button variant="secondary" onClick={() => setShowCreateCase(false)}>
+                  Cancel
+                </Button>
+              </div>
+              {isCreatingCase && <div className="h-2 bg-primary/20 animate-pulse rounded" />}
+            </div>
+          )}
+
+          {hasCase && investigationCase && (
+            <div className="space-y-6">
+              {/* Case Status & Controls */}
+              <div className="p-4 bg-bg-elevated/50 border border-border/50 rounded-lg space-y-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-text-muted">Status:</span>
+                    <Badge variant={
+                      investigationCase.status === 'resolved' ? 'success' :
+                      investigationCase.status === 'dismissed' ? 'danger' :
+                      investigationCase.status === 'escalated' ? 'warning' :
+                      investigationCase.status === 'under_review' ? 'info' : 'neutral'
+                    } className="gap-1 text-sm">
+                      {CASE_STATUS_LABELS[investigationCase.status]}
+                    </Badge>
+                  </div>
+                  {investigationCase.decision && (
+                    <Badge variant="neutral" className="gap-1 text-sm">
+                      {CASE_DECISION_LABELS[investigationCase.decision]}
+                    </Badge>
+                  )}
+                  <span className="text-xs text-text-muted">
+                    Updated: {formatRelativeTime(investigationCase.updated_at)}
+                    {investigationCase.resolved_at && ` • Resolved: ${formatRelativeTime(investigationCase.resolved_at)}`}
+                  </span>
+                </div>
+
+                {/* Status Transition Controls */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-medium text-text-muted">Change Status:</span>
+                  {STATUS_TRANSITIONS[investigationCase.status]?.map((nextStatus) => (
+                    <Button
+                      key={nextStatus}
+                      variant={investigationCase.status === nextStatus ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => handleStatusChange(nextStatus)}
+                      disabled={updateCaseMutation.isPending}
+                    >
+                      {CASE_STATUS_LABELS[nextStatus]}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Decision Selector (shown when relevant) */}
+                {['resolved', 'escalated', 'dismissed'].includes(investigationCase.status) && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-sm font-medium text-text-muted">Decision:</label>
+                    <Select
+                      value={investigationCase.decision ?? ''}
+                      onChange={(e) => handleDecisionChange(e.target.value as CaseDecision | null)}
+                      options={DECISION_OPTIONS_BY_STATUS[investigationCase.status].map(d => ({
+                        value: d ?? '',
+                        label: d ? CASE_DECISION_LABELS[d] : '— (unset)',
+                      }))}
+                      disabled={updateCaseMutation.isPending}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Notes Section */}
+              <div className="p-4 bg-bg-elevated/50 border border-border/50 rounded-lg space-y-3">
+                <label className="block text-sm font-medium text-text-muted">Analyst Notes</label>
+                <Textarea
+                  value={notes}
+                  onChange={handleNotesChange}
+                  placeholder="Add investigation notes, findings, or rationale..."
+                  rows={4}
+                  disabled={updateCaseMutation.isPending}
+                />
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={updateCaseMutation.isPending || isSaving}
+                  >
+                    {updateCaseMutation.isPending || isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                  {saveError && (
+                    <span className="text-sm text-danger flex items-center gap-1">
+                      <AlertTriangle className="w-4 h-4" />
+                      {saveError}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Audit Timeline */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-text-muted mb-3">Audit Timeline</h4>
+                {auditLoading ? (
+                  <div className="h-32 animate-pulse bg-bg-elevated/50 rounded" />
+                ) : auditLogs && auditLogs.length > 0 ? (
+                  <div className="space-y-2">
+                    {auditLogs.map((log) => (
+                      <AuditLogEntry key={log.id} log={log} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-muted text-center py-4">No audit entries yet</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {caseError && hasCase && (
+            <div className="p-4 bg-danger-bg border border-danger-border rounded-lg text-sm text-danger flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Failed to load investigation case: {caseError.message}
+            </div>
+          )}
+
+          {createCaseMutation.isError && showCreateCase && (
+            <div className="p-4 bg-danger-bg border border-danger-border rounded-lg text-sm text-danger flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              {createCaseMutation.error?.message || 'Failed to create investigation case'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -302,6 +676,12 @@ export function Investigations() {
                       <p className="text-2xl font-bold text-text">{event.trust_score.toFixed(1)}</p>
                     </div>
                   )}
+                  {event.payment_id && (
+                    <Link to={`/ledger/${event.payment_id}`} className="inline-flex items-center gap-2 text-primary hover:underline text-sm mt-2">
+                      <ChevronRight className="w-4 h-4" />
+                      View Ledger
+                    </Link>
+                  )}
                 </>
               ) : (
                 <>
@@ -364,6 +744,78 @@ export function Investigations() {
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuditLogEntry({ log }: { log: { id: number; action: string; old_state: string | null; new_state: string | null; timestamp: string } }) {
+  const parseState = (state: string | null) => {
+    if (!state) return null;
+    try {
+      return JSON.parse(state);
+    } catch {
+      return { raw: state };
+    }
+  };
+
+  const oldState = parseState(log.old_state);
+  const newState = parseState(log.new_state);
+
+  const getActionLabel = (action: string) => {
+    switch (action) {
+      case 'case_created': return 'Case Created';
+      case 'case_updated': return 'Case Updated';
+      default: return action;
+    }
+  };
+
+  const renderState = (state: any, label: string) => {
+    if (!state) return <span className="text-text-muted">—</span>;
+    if (state.raw) return <span className="text-text-muted text-xs">{state.raw}</span>;
+    if (typeof state === 'object' && Object.keys(state).length === 0) return <span className="text-text-muted">—</span>;
+    const entries = Object.entries(state) as [string, unknown][];
+    return (
+      <div className="flex flex-wrap gap-2 text-xs">
+        {entries.map(([key, value]) => (
+          <span key={key} className="bg-bg-elevated/50 px-2 py-1 rounded text-text">
+            {key}: <span className="font-mono">{String(typeof value === 'object' && value !== null ? JSON.stringify(value) : (value ?? '—'))}</span>
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-3 bg-bg-elevated/50 border border-border/50 rounded-lg">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <Badge variant="neutral" className="text-xs">
+            {log.action === 'case_created' ? (
+              <>
+                <CheckCircle className="w-3 h-3 mr-1 text-emerald-400" />
+              </>
+            ) : (
+              <>
+                <Pencil className="w-3 h-3 mr-1 text-primary" />
+              </>
+            )}
+            {getActionLabel(log.action)}
+          </Badge>
+        </div>
+        <span className="text-[10px] text-text-muted">
+          {formatRelativeTime(log.timestamp)}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-4 text-xs">
+        <div>
+          <p className="text-text-muted mb-1">Before</p>
+          {renderState(oldState, 'Before')}
+        </div>
+        <div>
+          <p className="text-text-muted mb-1">After</p>
+          {renderState(newState, 'After')}
         </div>
       </div>
     </div>

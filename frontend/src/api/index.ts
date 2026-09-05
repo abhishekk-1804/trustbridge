@@ -18,6 +18,10 @@ import type {
   ApiError,
   CopilotRequest,
   CopilotResponse,
+  InvestigationCase,
+  InvestigationCaseCreate,
+  InvestigationCaseUpdate,
+  AuditLogEntry,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
@@ -144,6 +148,27 @@ class ApiClient {
 
   async explainRiskEvent(transactionId: number): Promise<any> {
     const { data } = await this.client.get(`/risk/explain/${transactionId}`);
+    return data;
+  }
+
+  // Investigations
+  async createInvestigationCase(request: InvestigationCaseCreate): Promise<InvestigationCase> {
+    const { data } = await this.client.post('/investigations', request);
+    return data;
+  }
+
+  async getInvestigationCase(caseId: number): Promise<InvestigationCase> {
+    const { data } = await this.client.get(`/investigations/${caseId}`);
+    return data;
+  }
+
+  async updateInvestigationCase(caseId: number, request: InvestigationCaseUpdate): Promise<InvestigationCase> {
+    const { data } = await this.client.patch(`/investigations/${caseId}`, request);
+    return data;
+  }
+
+  async getInvestigationAuditLog(caseId: number): Promise<AuditLogEntry[]> {
+    const { data } = await this.client.get(`/investigations/${caseId}/audit-log`);
     return data;
   }
 
@@ -409,5 +434,45 @@ export function useCopilotExamples() {
   return useQuery({
     queryKey: ['copilot', 'examples'],
     queryFn: () => api.getCopilotExamples(),
+  });
+}
+
+export function useCreateInvestigationCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: InvestigationCaseCreate) => api.createInvestigationCase(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investigations'] });
+      queryClient.invalidateQueries({ queryKey: ['risk', 'events'] });
+    },
+  });
+}
+
+export function useInvestigationCase(caseId: number) {
+  return useQuery({
+    queryKey: ['investigations', caseId],
+    queryFn: () => api.getInvestigationCase(caseId),
+    enabled: !!caseId,
+  });
+}
+
+export function useUpdateInvestigationCase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ caseId, update }: { caseId: number; update: InvestigationCaseUpdate }) =>
+      api.updateInvestigationCase(caseId, update),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['investigations', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['investigations'] });
+      queryClient.invalidateQueries({ queryKey: ['risk', 'events'] });
+    },
+  });
+}
+
+export function useInvestigationAuditLog(caseId: number) {
+  return useQuery({
+    queryKey: ['investigations', caseId, 'audit-log'],
+    queryFn: () => api.getInvestigationAuditLog(caseId),
+    enabled: !!caseId,
   });
 }

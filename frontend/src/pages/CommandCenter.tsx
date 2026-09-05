@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Link } from 'react-router-dom';
 import { useDashboardSummary, useLiveRiskFeed, useRecentTransactions, useRiskActivity } from '@/api';
 import { formatCurrency, formatRelativeTime } from '@/utils';
 import { cn } from '@/utils';
@@ -14,6 +15,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   ExternalLink,
+  ArrowRight,
 } from 'lucide-react';
 
 interface LiveRiskEvent {
@@ -85,6 +87,10 @@ export function CommandCenter() {
           <Badge variant="danger" className="text-xs">HIGH</Badge>
           <p className="text-[10px] text-text-muted mt-0.5">{formatRelativeTime(event.timestamp)}</p>
         </div>
+        <Link to={`/investigations/${event.id}`} className="text-primary hover:underline text-sm flex items-center gap-1 ml-2">
+          <ArrowRight className="w-3 h-3" />
+          Investigate
+        </Link>
       </div>
     ));
   }, [riskFeed, riskLoading]);

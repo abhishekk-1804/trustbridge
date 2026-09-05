@@ -267,3 +267,43 @@ export interface CopilotResponse {
   context_used: Record<string, any>;
   ai_available: boolean;
 }
+
+export type CaseStatus = 'pending' | 'under_review' | 'resolved' | 'escalated' | 'dismissed';
+
+export type CaseDecision = 'true_positive' | 'false_positive' | 'inconclusive' | 'escalated';
+
+export type RiskEventType = 'transaction' | 'payment';
+
+export interface InvestigationCase {
+  id: number;
+  risk_event_id: number;
+  risk_event_type: RiskEventType;
+  status: CaseStatus;
+  analyst_id: number | null;
+  notes: string | null;
+  decision: CaseDecision | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+
+export interface InvestigationCaseCreate {
+  risk_event_id: number;
+  risk_event_type: RiskEventType;
+}
+
+export interface InvestigationCaseUpdate {
+  status?: CaseStatus;
+  notes?: string;
+  decision?: CaseDecision;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  case_id: number;
+  user_id: number | null;
+  action: string;
+  old_state: string | null;
+  new_state: string | null;
+  timestamp: string;
+}
