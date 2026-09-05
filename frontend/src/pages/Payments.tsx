@@ -51,6 +51,13 @@ export function Payments() {
     setSimError('');
     setSimSuccess(false);
 
+    // Validate sender != receiver
+    if (simForm.sender_account_id && simForm.receiver_account_id && 
+        Number(simForm.sender_account_id) === Number(simForm.receiver_account_id)) {
+      setSimError('Sender and receiver cannot be the same account.');
+      return;
+    }
+
     try {
       await simulateMutation.mutateAsync({
         sender_account_id: Number(simForm.sender_account_id),

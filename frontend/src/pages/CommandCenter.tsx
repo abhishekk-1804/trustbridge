@@ -76,23 +76,28 @@ export function CommandCenter() {
         <div key={i} className="h-16 animate-pulse bg-bg-elevated rounded" />
       ));
     }
-    return riskFeed?.events.slice(0, 5).map((event) => (
-      <div key={event.id} className="flex items-center gap-3 p-3 bg-bg-elevated/50 rounded-lg border border-border/50">
-        <div className="w-2 h-2 rounded-full bg-red-400" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-text truncate">{event.user_name}</p>
-          <p className="text-xs text-text-muted truncate">{event.reason}</p>
+    return riskFeed?.events.slice(0, 5).map((event) => {
+      const riskLevel = (event.risk_level || '').toLowerCase();
+      const badgeVariant = riskLevel === 'high' ? 'danger' : riskLevel === 'moderate' ? 'warning' : 'success';
+      const riskLabel = riskLevel === 'high' ? 'HIGH' : riskLevel === 'moderate' ? 'MODERATE' : 'LOW';
+      return (
+        <div key={event.id} className="flex items-center gap-3 p-3 bg-bg-elevated/50 rounded-lg border border-border/50">
+          <div className="w-2 h-2 rounded-full bg-red-400" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text truncate">{event.user_name}</p>
+            <p className="text-xs text-text-muted truncate">{event.reason}</p>
+          </div>
+          <div className="text-right">
+            <Badge variant={badgeVariant} className="text-xs">{riskLabel}</Badge>
+            <p className="text-[10px] text-text-muted mt-0.5">{formatRelativeTime(event.timestamp)}</p>
+          </div>
+          <Link to={`/investigations/${event.id}`} className="text-primary hover:underline text-sm flex items-center gap-1 ml-2">
+            <ArrowRight className="w-3 h-3" />
+            Investigate
+          </Link>
         </div>
-        <div className="text-right">
-          <Badge variant="danger" className="text-xs">HIGH</Badge>
-          <p className="text-[10px] text-text-muted mt-0.5">{formatRelativeTime(event.timestamp)}</p>
-        </div>
-        <Link to={`/investigations/${event.id}`} className="text-primary hover:underline text-sm flex items-center gap-1 ml-2">
-          <ArrowRight className="w-3 h-3" />
-          Investigate
-        </Link>
-      </div>
-    ));
+      );
+    });
   }, [riskFeed, riskLoading]);
 
   return (
@@ -172,7 +177,6 @@ export function CommandCenter() {
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm text-text-muted">
                   <span>Risk Events (Amber)</span>
-                  <span>Transactions (Gray)</span>
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm text-text-muted">
                   <span>Total Analyzed: {riskActivity?.total_analyzed ?? 0} transactions</span>
