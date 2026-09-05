@@ -19,6 +19,7 @@ from backend.api.risk import router as risk_router
 from backend.api.payments import router as payments_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.copilot import router as copilot_router
+from backend.api.investigations import router as investigations_router
 from backend.db import init_db
 
 # Configure logging
@@ -163,6 +164,7 @@ app.include_router(users_router, prefix="/api")
 app.include_router(risk_router, prefix="/api")
 app.include_router(payments_router, prefix="/api")
 app.include_router(copilot_router, prefix="/api")
+app.include_router(investigations_router, prefix="/api")
 
 
 @app.get("/api/health")

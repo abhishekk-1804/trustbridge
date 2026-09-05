@@ -118,3 +118,63 @@ class AssessRiskRequest(BaseModel):
 class AssessRiskResponse(BaseModel):
     risk_assessment: RiskAssessment
     user: dict
+
+
+class CaseStatus(str, Enum):
+    PENDING = "pending"
+    UNDER_REVIEW = "under_review"
+    RESOLVED = "resolved"
+    ESCALATED = "escalated"
+    DISMISSED = "dismissed"
+
+
+class CaseDecision(str, Enum):
+    TRUE_POSITIVE = "true_positive"
+    FALSE_POSITIVE = "false_positive"
+    INCONCLUSIVE = "inconclusive"
+    ESCALATED = "escalated"
+
+
+class RiskEventType(str, Enum):
+    TRANSACTION = "transaction"
+    PAYMENT = "payment"
+
+
+class InvestigationCaseCreate(BaseModel):
+    risk_event_id: int
+    risk_event_type: RiskEventType
+
+
+class InvestigationCaseUpdate(BaseModel):
+    status: Optional[CaseStatus] = None
+    notes: Optional[str] = None
+    decision: Optional[CaseDecision] = None
+
+
+class InvestigationCaseResponse(BaseModel):
+    id: int
+    risk_event_id: int
+    risk_event_type: RiskEventType
+    status: CaseStatus
+    analyst_id: Optional[int] = None
+    notes: Optional[str] = None
+    decision: Optional[CaseDecision] = None
+    created_at: datetime
+    updated_at: datetime
+    resolved_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogResponse(BaseModel):
+    id: int
+    case_id: int
+    user_id: Optional[int] = None
+    action: str
+    old_state: Optional[str] = None
+    new_state: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
