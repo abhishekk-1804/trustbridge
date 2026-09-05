@@ -74,18 +74,15 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
-# CORS configuration - use environment variable in production
-if settings.is_production:
-    allow_origins = settings.cors_origins_list
-else:
-    allow_origins = settings.cors_origins_list
+# CORS configuration
+allow_origins = settings.cors_origins_list
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With", "X-Idempotency-Key"],
 )
 
 # Request size limit middleware

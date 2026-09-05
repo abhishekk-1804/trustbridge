@@ -1,12 +1,13 @@
 # TrustBridge Configuration
 from pydantic_settings import BaseSettings
-from typing import Optional, List
+from typing import Optional, List, Union
+import json
 
 
 class Settings(BaseSettings):
     # Application
     app_env: str = "development"
-    debug: bool = True
+    debug: bool = False
     log_level: str = "INFO"
 
     # Database
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     api_workers: int = 1
 
     # CORS
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+    cors_origins: Union[List[str], str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"]
 
     # AI Provider (Backend-only)
     ai_provider: str = "openai"
@@ -55,7 +56,18 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        return [origin.strip() for origin in self.cors_origins.split(",")]
+        if isinstance(self.cors_origins, list):
+            return self.cors_origins
+        if isinstance(self.cors_origins, str):
+            # Try to parse as JSON list first, then fall back to comma-separated
+            try:
+                parsed = json.loads(self.cors_origins)
+                if isinstance(parsed, list):
+                    return [str(origin).strip() for origin in parsed]
+            except json.JSONDecodeError:
+                pass
+            return [origin.strip() for origin in self.cors_origins.split(",")]
+        return []
 
     @property
     def is_production(self) -> bool:
