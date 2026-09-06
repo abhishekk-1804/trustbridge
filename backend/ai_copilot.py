@@ -222,6 +222,17 @@ class ContextBuilder:
         from engine.ml_fraud import evaluate_model
         try:
             eval_result = evaluate_model()
+            # Convert numpy types to native Python types for JSON serialization
+            def convert(obj):
+                if hasattr(obj, 'item'):
+                    return obj.item()
+                elif isinstance(obj, dict):
+                    return {k: convert(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert(v) for v in obj]
+                return obj
+
+            eval_result = convert(eval_result)
             return {
                 "precision": eval_result.get("precision", 0),
                 "recall": eval_result.get("recall", 0),
