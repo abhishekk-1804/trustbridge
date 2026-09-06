@@ -380,6 +380,72 @@ class TestPaymentEndpoints:
 class TestCopilotEndpoints:
     """Test AI Copilot endpoints."""
 
+    def test_copilot_model_precision_recall_success(self, client, monkeypatch):
+        """Test that Copilot model precision/recall query succeeds.
+
+        Regression test for: NumPy serialization error when model metrics contain
+        np.int64/np.float64 values causing PydanticSerializationError.
+
+        The NVIDIA API call is mocked to make the test deterministic and fast.
+        """
+        # Mock the NVIDIA LLM call to return a deterministic generic response
+        async def mock_call_llm(messages):
+            return ("**Model Precision & Recall (TrustBridge Synthetic Demo)**\n\n"
+                    "Precision and recall metrics are available in the structured context. "
+                    "The model's precision and recall values are computed on the synthetic "
+                    "evaluation dataset with injected anomalies.")
+
+        import backend.api.copilot as copilot_module
+        monkeypatch.setattr("backend.api.copilot.call_llm", mock_call_llm)
+
+        response = client.post("/api/copilot/ask", json={
+            "query": "What is the model precision and recall?"
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert "response" in data
+        assert "intent" in data
+        assert data["intent"] == "model_performance"
+        assert "context_used" in data
+        assert "ai_available" in data
+        assert data["ai_available"] == True
+
+        # Verify the response contains precision and recall information
+        response_text = data["response"].lower()
+        assert "precision" in response_text
+        assert "recall" in response_text
+
+        # Verify model metrics are present in context_used and are JSON-serializable native types
+        context_used = data.get("context_used", {})
+        assert "model_metrics" in context_used
+        metrics = context_used["model_metrics"]
+        assert "precision" in metrics
+        assert "recall" in metrics
+        assert "f1" in metrics
+        assert "confusion_matrix" in metrics
+        assert "total_transactions" in metrics
+        assert "true_anomalies" in metrics
+        assert "predicted_anomalies" in metrics
+        assert "anomalies_detected" in metrics
+        assert "false_positives" in metrics
+        assert "false_negatives" in metrics
+
+        # Verify all values are JSON-serializable native Python types
+        import json
+        for key, value in metrics.items():
+            json.dumps(value)  # Should not raise TypeError
+            if key in ("precision", "recall", "f1"):
+                assert isinstance(value, (int, float))
+            elif key in ("total_transactions", "true_anomalies", "anomalies_detected",
+                         "false_positives", "false_negatives", "predicted_anomalies"):
+                assert isinstance(value, int)
+            elif key == "confusion_matrix":
+                assert isinstance(value, list)
+                for row in value:
+                    assert isinstance(row, list)
+                    for val in row:
+                        assert isinstance(val, int)
+
     def test_copilot_numpy_serialization(self, client, db_session):
         """Test that NumPy scalar values in model metrics are properly converted to JSON-serializable native Python values.
 
@@ -429,45 +495,6 @@ class TestCopilotEndpoints:
                     for val in row:
                         assert isinstance(val, int)
 
-    def test_copilot_model_precision_recall_success(self, client, monkeypatch):
-        """Test that Copilot model precision/recall query succeeds even with zero true positives.
-
-        Regression test for: NumPy serialization error when model metrics contain
-        np.int64/np.float64 values causing PydanticSerializationError.
-
-        The NVIDIA API call is mocked to make the test deterministic and fast.
-        """
-        # Mock the NVIDIA LLM call to return a deterministic response
-        async def mock_call_llm(messages):
-            return ("**Model Precision & Recall (TrustBridge Synthetic Demo)**\n\n"
-                    "**Precision:** 0.25  \n"
-                    "*1 true positive out of 4 predicted anomalies (TP = 1, FP = 3).*  \n"
-                    "Precision measures the proportion of flagged transactions that are genuinely anomalous. "
-                    "A score of 0.25 indicates that 75% of the model's anomaly flags were false positives "
-                    "in this evaluation.\n\n"
-                    "**Recall:** 0.50  \n"
-                    "*1 true positive out of 2 actual injected anomalies (TP = 1, FN = 1).*  \n"
-                    "Recall measures the proportion of actual anomalies that were correctly identified.")
-
-        import backend.api.copilot as copilot_module
-        monkeypatch.setattr("backend.api.copilot.call_llm", mock_call_llm)
-
-        response = client.post("/api/copilot/ask", json={
-            "query": "What is the model precision and recall?"
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert "response" in data
-        assert "intent" in data
-        assert data["intent"] == "model_performance"
-        assert "context_used" in data
-        assert "ai_available" in data
-        assert data["ai_available"] == True
-
-        # Verify the response contains precision and recall information
-        response_text = data["response"].lower()
-        assert "precision" in response_text
-        assert "recall" in response_text
 
     def test_copilot_status(self, client):
         response = client.get("/api/copilot/status")
