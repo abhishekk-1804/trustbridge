@@ -21,6 +21,7 @@ from backend.api.dashboard import router as dashboard_router
 from backend.api.copilot import router as copilot_router
 from backend.api.investigations import router as investigations_router
 from backend.db import init_db
+from data.generator import seed_synthetic_data
 
 # Configure logging
 logging.basicConfig(level=getattr(logging, settings.log_level.upper()))
@@ -59,6 +60,8 @@ rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
 async def lifespan(app: FastAPI):
     # Startup
     init_db()
+    # Seed deterministic synthetic demo data if database is empty
+    seed_synthetic_data()
     logger.info("TrustBridge API started")
     yield
     # Shutdown (if needed)

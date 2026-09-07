@@ -586,5 +586,140 @@ class TestErrorHandling:
         assert response.status_code == 422
 
 
+class TestDatabaseSeeding:
+    """Test synthetic data seeding behavior."""
+
+    def test_seed_synthetic_data_on_empty_db(self):
+        """Test that seed_synthetic_data populates an empty database."""
+        from database.db import reset_db, init_db, get_session_direct
+        from data.generator import seed_synthetic_data
+        from database.models import User, Transaction
+
+        # Start with completely empty database
+        reset_db()
+        init_db()
+
+        session = get_session_direct()
+        try:
+            assert session.query(User).count() == 0
+        finally:
+            session.close()
+
+        # Seed the data
+        result = seed_synthetic_data()
+        assert result is True  # Should return True when seeding occurred
+
+        # Verify data was seeded
+        session = get_session_direct()
+        try:
+            users = session.query(User).all()
+            assert len(users) == 3
+            user_names = {u.name for u in users}
+            assert "Raj – Delivery Partner" in user_names
+            assert "Priya – Freelancer" in user_names
+            assert "Anil – Student" in user_names
+
+            txn_count = session.query(Transaction).count()
+            assert txn_count >= 390  # Approximately 399
+
+            # Verify anomalies exist
+            anomaly_count = session.query(Transaction).filter(Transaction.is_anomaly == True).count()
+            assert anomaly_count == 2
+        finally:
+            session.close()
+
+    def test_seed_synthetic_data_idempotent(self):
+        """Test that seed_synthetic_data does not regenerate data on non-empty database."""
+        from database.db import reset_db, init_db, get_session_direct
+        from data.generator import seed_synthetic_data
+        from database.models import User, Transaction
+
+        # Start with empty database and seed once
+        reset_db()
+        init_db()
+        seed_synthetic_data()
+
+        # Get initial counts
+        session = get_session_direct()
+        try:
+            initial_user_count = session.query(User).count()
+            initial_txn_count = session.query(Transaction).count()
+            initial_anomaly_count = session.query(Transaction).filter(Transaction.is_anomaly == True).count()
+        finally:
+            session.close()
+
+        # Call seed again - should not regenerate
+        result = seed_synthetic_data()
+        assert result is False  # Should return False when no seeding occurred
+
+        # Verify counts unchanged
+        session = get_session_direct()
+        try:
+            assert session.query(User).count() == initial_user_count
+            assert session.query(Transaction).count() == initial_txn_count
+            assert session.query(Transaction).filter(Transaction.is_anomaly == True).count() == initial_anomaly_count
+        finally:
+            session.close()
+
+    def test_seeded_data_contains_expected_anomaly(self):
+        """Test that transaction #121 is Raj's AMOUNT_SPIKE anomaly (seed=42 deterministic)."""
+        from database.db import reset_db, init_db, get_session_direct
+        from data.generator import seed_synthetic_data
+        from database.models import Transaction
+
+        reset_db()
+        init_db()
+        seed_synthetic_data()
+
+        session = get_session_direct()
+        try:
+            # Find Raj's anomaly (anomaly_txn_idx=120, 0-indexed, so transaction #121 in 1-indexed)
+            # The generator creates transactions per user sequentially, so we need to find
+            # the anomaly with AMOUNT_SPIKE for Raj (user_id=1)
+            anomalies = session.query(Transaction).filter(
+                Transaction.is_anomaly == True,
+                Transaction.anomaly_type == "AMOUNT_SPIKE"
+            ).all()
+
+            assert len(anomalies) == 2
+
+            # Find Raj's anomaly (user_id=1, since Raj is first user created)
+            raj_anomaly = None
+            for a in anomalies:
+                if a.user_id == 1:  # Raj is first user
+                    raj_anomaly = a
+                    break
+
+            assert raj_anomaly is not None, "Raj's anomaly not found"
+            # Verify amount: ~1500 * 8.0 = 12000, but with gaussian noise it's around 13420.85
+            amount_inr = float(raj_anomaly.get_amount_decimal())
+            # The exact amount with seed=42: 13420.85 (from generator's gaussian with multiplier 8.0)
+            assert abs(amount_inr - 13420.85) < 1.0, f"Expected ~13420.85, got {amount_inr}"
+            assert raj_anomaly.anomaly_type == "AMOUNT_SPIKE"
+        finally:
+            session.close()
+
+    def test_lifespan_seeds_database(self):
+        """Test that the FastAPI lifespan seeds the database on startup."""
+        from backend.main import app
+        from fastapi.testclient import TestClient
+        from database.db import reset_db, init_db, get_session_direct
+        from database.models import User
+
+        # Reset database to empty
+        reset_db()
+        init_db()
+
+        # Create test client - this triggers lifespan
+        with TestClient(app) as client:
+            # Verify database was seeded by lifespan
+            session = get_session_direct()
+            try:
+                user_count = session.query(User).count()
+                assert user_count == 3, f"Expected 3 users after lifespan seeding, got {user_count}"
+            finally:
+                session.close()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

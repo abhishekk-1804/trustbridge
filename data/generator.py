@@ -224,6 +224,87 @@ def get_user_transaction_counts():
         session.close()
 
 
+def seed_synthetic_data():
+    """Seed synthetic demo data only if database is empty.
+
+    Does NOT call reset_db() - preserves existing data on subsequent calls.
+    Uses the same deterministic seed=42 as generate_synthetic_data().
+    """
+    from database.db import init_db, get_session_direct
+
+    # Ensure tables exist
+    init_db()
+
+    session = get_session_direct()
+    try:
+        # Check if data already exists
+        user_count = session.query(User).count()
+        if user_count > 0:
+            logger = __import__('logging').getLogger(__name__)
+            logger.info(f"Database already seeded with {user_count} users, skipping synthetic data generation")
+            return False
+
+        # Database is empty - generate deterministic synthetic data
+        random.seed(SEED)
+
+        users = []
+        accounts = []
+        all_transactions = []
+
+        start_date = datetime(2024, 1, 1)
+        txns_per_user = TOTAL_TRANSACTIONS_TARGET // len(USER_PROFILES)
+
+        for profile_data in USER_PROFILES:
+            user = User(
+                name=profile_data["name"],
+                email=profile_data["email"],
+                role=profile_data["role"],
+                account_created_at=start_date - timedelta(days=30),
+                is_verified=True
+            )
+            session.add(user)
+            session.flush()
+
+            account = Account(
+                user_id=user.id,
+                account_type="savings",
+                balance=int(Decimal(str(random.uniform(10000, 50000))) * Decimal(100)),
+                currency="INR",
+                status=AccountStatus.ACTIVE,
+                created_at=start_date - timedelta(days=30)
+            )
+            session.add(account)
+            session.flush()
+
+            users.append(user)
+            accounts.append(account)
+
+        session.commit()
+
+        for user, account, profile_data in zip(users, accounts, USER_PROFILES):
+            txns = generate_user_transactions(
+                session, user, account, profile_data, txns_per_user, start_date
+            )
+            session.add_all(txns)
+            all_transactions.extend(txns)
+
+        session.commit()
+
+        logger = __import__('logging').getLogger(__name__)
+        logger.info(f"Seeded synthetic data: {len(users)} users, {len(all_transactions)} transactions")
+        anomaly_count = sum(1 for t in all_transactions if t.is_anomaly)
+        logger.info(f"Anomalies injected: {anomaly_count}")
+
+        for txn in all_transactions:
+            if txn.is_anomaly:
+                logger.info(f"  Anomaly: User {txn.user_id}, Txn {txn.id}, Amount Rs.{txn.get_amount_decimal()}, Type: {txn.anomaly_type}")
+
+        return True
+
+    finally:
+        session.close()
+
+
 if __name__ == "__main__":
     generate_synthetic_data()
     counts = get_user_transaction_counts()
